@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Detector de Centrado NAA (Computación Local)</title>
+    <title>Detector NAA - Cámara Trasera y Móvil</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -23,7 +23,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            /* Altura dinámica para evitar que la barra de navegación del móvil oculte botones */
+            min-height: 100vh; 
             overflow: hidden;
         }
 
@@ -48,14 +49,14 @@
             overflow: hidden;
         }
 
-        #video-element { display: none; } /* Oculto, se dibuja en canvas */
+        #video-element { display: none; }
 
         #canvas-container {
             position: relative;
             width: 100%;
             max-width: 600px;
-            /* Relación de aspecto típica 4:3 para cámara */
-            aspect-ratio: 4 / 3;
+            /* Usamos la altura completa disponible para maximizar el visor en móviles */
+            height: 100%; 
             background-color: #000;
         }
 
@@ -63,7 +64,7 @@
             width: 100%;
             height: 100%;
             display: block;
-            touch-action: none; /* Previene scroll al tocar el canvas */
+            touch-action: none;
         }
 
         #status-overlay {
@@ -77,6 +78,7 @@
             text-align: center;
             pointer-events: none;
             width: 80%;
+            max-width: 300px; /* Evita que sea excesivamente ancho */
         }
 
         #status-text {
@@ -89,6 +91,7 @@
         #status-text.descentrada { color: var(--danger-color); }
         #status-text.buscando { color: #ffc107; }
 
+        /* Controles adaptables (Responsive) */
         #controls {
             width: 100%;
             background-color: var(--panel-bg);
@@ -98,6 +101,7 @@
             gap: 15px;
             box-sizing: border-box;
             z-index: 10;
+            flex-wrap: wrap; /* Permite que los botones pasen a la siguiente línea si no caben */
         }
 
         .btn {
@@ -109,8 +113,10 @@
             font-size: 1rem;
             cursor: pointer;
             transition: background-color 0.2s;
-            flex: 1;
-            max-width: 200px;
+            flex: 1; /* Los botones crecen para ocupar el espacio */
+            min-width: 150px; /* Anchura mínima antes de saltar de línea */
+            max-width: 300px;
+            text-align: center;
         }
 
         .btn:hover { background-color: #0056b3; }
@@ -127,13 +133,27 @@
             font-size: 0.8rem;
             color: rgba(255,255,255,0.7);
             pointer-events: none;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+
+        /* Media Query para pantallas muy estrechas (móviles en vertical) */
+        @media (max-width: 400px) {
+            #controls {
+                flex-direction: column; /* Apila los botones uno encima de otro */
+                padding: 10px;
+                gap: 10px;
+            }
+            .btn {
+                max-width: 100%; /* El botón ocupa todo el ancho */
+            }
         }
     </style>
 </head>
 <body>
 
     <div id="header">
-        <h1>Control NAA - Visión Local</h1>
+        <h1>NAA Align (Cámara Trasera)</h1>
     </div>
 
     <div id="main-container">
@@ -169,24 +189,20 @@
         let staticImage = null;
         let reqAnimFrame;
 
-        // Variables de la zona de medición (O-ring)
         let measureX = 0;
         let measureY = 0;
         let measureRadius = 50;
 
-        // Variables para la interacción táctil
         let isDragging = false;
         let isResizing = false;
         let dragOffsetX = 0;
         let dragOffsetY = 0;
 
-        // Configurar Canvas inicial
         function resizeCanvas() {
             const container = document.getElementById('canvas-container');
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
             
-            // Centrar el área de medición la primera vez
             if (measureX === 0) {
                 measureX = canvas.width / 2;
                 measureY = canvas.height / 2;
@@ -195,18 +211,12 @@
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
-
-        // -----------------------------------------------------------------
-        // CONTROL DE INTERACCIÓN: Tocar y arrastrar
-        // -----------------------------------------------------------------
         
         function getPointerPos(e) {
             const rect = canvas.getBoundingClientRect();
-            // Soporte para touch y ratón
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             
-            // Ajustar coordenadas a la escala interna del canvas
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             
@@ -219,19 +229,15 @@
         canvas.addEventListener('pointerdown', (e) => {
             const pos = getPointerPos(e);
             
-            // Comprobar distancia al centro
             const dx = pos.x - measureX;
             const dy = pos.y - measureY;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            // Margen para el borde (tirador de tamaño)
-            const edgeTolerance = 20;
+            const edgeTolerance = 30; // Aumentado un poco para facilitar el toque en móvil
 
             if (Math.abs(dist - measureRadius) < edgeTolerance) {
-                // Toca el borde -> Modo cambiar tamaño
                 isResizing = true;
             } else if (dist < measureRadius) {
-                // Toca el interior -> Modo mover
                 isDragging = true;
                 dragOffsetX = measureX - pos.x;
                 dragOffsetY = measureY - pos.y;
@@ -240,7 +246,7 @@
 
         window.addEventListener('pointermove', (e) => {
             if (!isDragging && !isResizing) return;
-            e.preventDefault(); // Evitar scroll en móviles
+            e.preventDefault(); 
             
             const pos = getPointerPos(e);
             
@@ -250,7 +256,7 @@
             } else if (isResizing) {
                 const dx = pos.x - measureX;
                 const dy = pos.y - measureY;
-                measureRadius = Math.max(20, Math.sqrt(dx*dx + dy*dy));
+                measureRadius = Math.max(30, Math.sqrt(dx*dx + dy*dy));
             }
         });
 
@@ -259,14 +265,11 @@
             isResizing = false;
         });
 
-
-        // -----------------------------------------------------------------
-        // CONTROL DE ENTRADAS (CÁMARA / IMAGEN)
-        // -----------------------------------------------------------------
-
+        // ACTIVA LA CÁMARA TRASERA
         btnCamera.addEventListener('click', async () => {
             staticImage = null;
             try {
+                // Se solicita específicamente "environment" (cámara trasera)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
                 });
@@ -276,7 +279,7 @@
                 if (!reqAnimFrame) processFrame();
             } catch (err) {
                 console.error("Error cámara:", err);
-                alert("No se pudo acceder a la cámara. Revisa permisos.");
+                alert("No se pudo acceder a la cámara trasera. Asegúrate de dar permisos.");
             }
         });
 
@@ -301,15 +304,8 @@
             reader.readAsDataURL(file);
         });
 
-
-        // -----------------------------------------------------------------
-        // ALGORITMO DE VISIÓN COMPUTACIONAL LOCAL
-        // -----------------------------------------------------------------
-
         function processFrame() {
-            // 1. Dibujar el fotograma actual o imagen en el canvas
             if (isVideoPlaying && video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Modo cover para llenar el canvas
                 const hRatio = canvas.width / video.videoWidth;
                 const vRatio = canvas.height / video.videoHeight;
                 const ratio = Math.max(hRatio, vRatio);
@@ -319,22 +315,19 @@
             } else if (staticImage) {
                 const hRatio = canvas.width / staticImage.width;
                 const vRatio = canvas.height / staticImage.height;
-                const ratio = Math.min(hRatio, vRatio); // Para imagen estática, fit en lugar de cover
+                const ratio = Math.min(hRatio, vRatio);
                 const centerShift_x = (canvas.width - staticImage.width * ratio) / 2;
                 const centerShift_y = (canvas.height - staticImage.height * ratio) / 2;  
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0,0, canvas.width, canvas.height);
                 ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, centerShift_x, centerShift_y, staticImage.width * ratio, staticImage.height * ratio);
             } else {
-                // Pantalla negra si no hay entrada
                 ctx.fillStyle = '#1e1e1e';
                 ctx.fillRect(0,0, canvas.width, canvas.height);
                 reqAnimFrame = requestAnimationFrame(processFrame);
                 return;
             }
 
-            // 2. Extraer datos de píxeles SOLO de la zona de medición
-            const boundingBoxSize = measureRadius * 2;
             const startX = Math.max(0, measureX - measureRadius);
             const startY = Math.max(0, measureY - measureRadius);
             const endX = Math.min(canvas.width, measureX + measureRadius);
@@ -346,36 +339,28 @@
                 const imgData = ctx.getImageData(startX, startY, width, height);
                 const data = imgData.data;
                 
-                // Variables para el análisis
-                let puntosCortantes = 0; // Puntos de contraste dentro del núcleo (mala señal)
-                let puntosBorde = 0;     // Puntos de contraste en la corona (buena señal)
+                let puntosCortantes = 0; 
+                let puntosBorde = 0;     
                 let totalPixelesNucleo = 0;
 
-                const radioNucleo = measureRadius * 0.70; // 70% interior
+                const radioNucleo = measureRadius * 0.70; 
                 
-                // Conversión a escala de grises y búsqueda de bordes (contraste local)
                 const grises = new Uint8Array(width * height);
                 for (let i = 0; i < data.length; i += 4) {
                     grises[i/4] = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
                 }
 
-                // Escaneo simplificado saltando píxeles para rendimiento (stride=2)
                 for (let y = 1; y < height - 1; y += 2) {
                     for (let x = 1; x < width - 1; x += 2) {
-                        // Distancia al centro de medición
                         const canvasX = startX + x;
                         const canvasY = startY + y;
                         const dx = canvasX - measureX;
                         const dy = canvasY - measureY;
                         const dist = Math.sqrt(dx*dx + dy*dy);
 
-                        // Solo nos importa lo que está dentro del radio del O-ring
                         if (dist <= measureRadius) {
-                            
-                            // Detectar cambio brusco de luz (Línea del escalón anodizado / puntos blancos)
                             const idx = y * width + x;
                             const centerPx = grises[idx];
-                            // Operador Laplaciano muy simple (detecta bordes)
                             const laplacian = Math.abs(
                                 4 * centerPx 
                                 - grises[idx - 1] 
@@ -384,18 +369,13 @@
                                 - grises[(y+1) * width + x]
                             );
 
-                            // Umbral para considerar que es "el borde punteado de la muestra"
-                            // (El aluminio base y la alúmina son más uniformes, el borde resalta)
                             if (laplacian > 60 && centerPx > 100) { 
-                                // ¿Dónde ha caído este borde?
                                 if (dist < radioNucleo) {
                                     puntosCortantes++;
-                                    // Pintar rojo tenue para depuración
                                     ctx.fillStyle = 'rgba(255,0,0,0.5)';
                                     ctx.fillRect(canvasX, canvasY, 2, 2);
                                 } else {
                                     puntosBorde++;
-                                    // Pintar verde tenue para depuración
                                     ctx.fillStyle = 'rgba(0,255,0,0.3)';
                                     ctx.fillRect(canvasX, canvasY, 2, 2);
                                 }
@@ -406,52 +386,43 @@
                     }
                 }
 
-                // 3. Evaluar el estado
-                // La muestra está DESCENTRADA si el arco de puntos cruza por el medio
                 const densidadCorte = totalPixelesNucleo > 0 ? (puntosCortantes / totalPixelesNucleo) * 100 : 0;
                 
                 debugText.textContent = `Pixeles cortando centro: ${puntosCortantes} (${densidadCorte.toFixed(2)}%)`;
 
                 if (densidadCorte > 0.4) { 
-                    // Hay un corte significativo cruzando la zona central
                     statusText.textContent = "DESCENTRADA";
                     statusText.className = "descentrada";
                 } else if (puntosBorde > 20) {
-                    // El centro está limpio y detecta el arco apoyado en la corona
                     statusText.textContent = "CENTRADA";
                     statusText.className = "centrada";
                 } else {
-                    // No hay información suficiente (fondo vacío u oscuro)
                     statusText.textContent = "BUSCANDO...";
                     statusText.className = "buscando";
                 }
             }
 
-            // 4. Dibujar la guía (O-ring virtual) encima de la imagen
             ctx.beginPath();
             ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
             ctx.strokeStyle = 'yellow';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Dibujar círculo interno (zona prohibida para el borde de la membrana)
             ctx.beginPath();
             ctx.arc(measureX, measureY, measureRadius * 0.70, 0, 2 * Math.PI);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
             ctx.setLineDash([5, 5]);
             ctx.lineWidth = 1;
             ctx.stroke();
-            ctx.setLineDash([]); // Reset dash
+            ctx.setLineDash([]); 
 
-            // Dibujar punto de agarre para resize
             ctx.beginPath();
-            ctx.arc(measureX + measureRadius, measureY, 8, 0, 2 * Math.PI);
+            ctx.arc(measureX + measureRadius, measureY, 12, 0, 2 * Math.PI); // Tirador un poco más grande
             ctx.fillStyle = 'rgba(255,255,0,0.8)';
             ctx.fill();
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1;
             ctx.stroke();
-
 
             reqAnimFrame = requestAnimationFrame(processFrame);
         }
