@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Alineador NAA - Borde Alumina</title>
+    <title>Alineador NAA - Control de Centrado</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -207,11 +207,12 @@
             <input type="range" id="slider-min-pvc" min="35" max="85" value="55">
             <span id="val-min-pvc">55%</span>
         </div>
+        <!-- Botón simplificado tal y como pediste -->
         <button id="btn-comprobar" class="btn btn-check">COMPROBAR</button>
         <div class="row-buttons">
             <button id="btn-autosnap" class="btn active-mode">🧲 Auto-PVC: ON</button>
             <button id="btn-camera" class="btn" id="btn-cam">📷 Cámara</button>
-            <!-- Método directo y compatible para carga de fotos en cualquier navegador -->
+            <!-- Forma clásica y 100% compatible para llamar al selector de archivos -->
             <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">📁 Foto</button>
         </div>
         <input type="file" id="file-input" accept="image/*">
@@ -227,8 +228,6 @@
         const sliderMinPvc = document.getElementById('slider-min-pvc');
         const valMinPvc = document.getElementById('val-min-pvc');
         const btnAutoSnap = document.getElementById('btn-autosnap');
-        const btnCamera = document.getElementById('btn-camera');
-        const btnComprobar = document.getElementById('btn-comprobar');
         const fileInput = document.getElementById('file-input');
 
         const IMGSZ = 160;
@@ -246,7 +245,7 @@
         let measureRadius = 70;
 
         let autoSnapPVC = true;
-        let minPorcentajePVC = 55; 
+        let minPorcentajePVC = 55; // Nivel de exigencia flexible (Luna creciente admisible)
 
         let isDragging = false;
         let isResizing = false;
@@ -281,7 +280,7 @@
             }
         }
         window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 100);
+        setTimeout(resizeCanvas, 80);
 
         function getPointerPos(e) {
             const rect = canvas.getBoundingClientRect();
@@ -339,7 +338,7 @@
             isResizing = false;
         });
 
-        btnCamera.addEventListener('click', async () => {
+        document.getElementById('btn-camera').addEventListener('click', async () => {
             staticImage = null;
             comprobacionActiva = false;
             try {
@@ -351,8 +350,9 @@
                 isVideoPlaying = true;
                 statusText.textContent = "CÁMARA LISTA - PULSA COMPROBAR";
                 statusText.className = "buscando";
+                if (!reqAnimFrame) renderLoop();
             } catch (err) {
-                alert("No se pudo abrir la cámara frontal. Revisa los permisos HTTPS.");
+                alert("No se pudo abrir la cámara frontal. Revisa permisos.");
             }
         });
 
@@ -360,7 +360,7 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            // Apagado seguro de cámara si estaba encendida
+            // Apagar cámara si está activa antes de cargar la foto
             if (video.srcObject && typeof video.srcObject.getTracks === 'function') {
                 video.srcObject.getTracks().forEach(t => t.stop());
                 video.srcObject = null;
@@ -376,12 +376,13 @@
                     statusText.textContent = "TOCA EL AGUJERO Y PULSA COMPROBAR";
                     statusText.className = "buscando";
                     pctPvcText.textContent = "Borde alumina: --%";
+                    if (!reqAnimFrame) renderLoop();
                 };
                 img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
             
-            // Limpia el input para que detecte si vuelves a subir exactamente la misma foto
+            // Permite recargar la misma foto si se desea
             e.target.value = '';
         });
 
@@ -411,7 +412,6 @@
                 ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, cx, cy, staticImage.width * ratio, staticImage.height * ratio);
                 return true;
             }
-            // Estado inicial de espera
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             return false;
@@ -449,4 +449,259 @@
             const pvcLum = pvcSamples.length > 10 ? pvcSamples[Math.floor(pvcSamples.length * 0.5)] : 60;
 
             function esInteriorHueco(px, py) {
-                if (px < 2 ||
+                if (px < 2 || px >= sw - 2 || py < 2 || py >= sh - 2) return false;
+                const l = lum[py * sw + px];
+                const grad = Math.abs(lum[py * sw + (px + 2)] - lum[py * sw + (px - 2)]) + Math.abs(lum[(py + 2) * sw + px] - lum[(py - 2) * sw + px]);
+                return Math.abs(l - pvcLum) > 15 || grad > 25;
+            }
+
+            let cx = measureX - sx;
+            let cy = measureY - sy;
+            let rEst = measureRadius;
+
+            for (let iter = 0; iter < 3; iter++) {
+                let sumX = 0, sumY = 0, count = 0;
+                const scanR = rEst * 1.1;
+                for (let y = Math.max(2, Math.floor(cy - scanR)); y < Math.min(sh - 2, Math.ceil(cy + scanR)); y += 2) {
+                    for (let x = Math.max(2, Math.floor(cx - scanR)); x < Math.min(sw - 2, Math.ceil(cx + scanR)); x += 2) {
+                        if (Math.hypot(x - cx, y - cy) <= scanR && esInteriorHueco(x, y)) {
+                            sumX += x; sumY += y; count++;
+                        }
+                    }
+                }
+                if (count > 30) {
+                    cx = cx * 0.3 + (sumX / count) * 0.7;
+                    cy = cy * 0.3 + (sumY / count) * 0.7;
+                }
+            }
+
+            const numRays = 64;
+            const edgePoints = [];
+            const maxRayR = Math.min(searchR * 0.95, Math.min(sw, sh) * 0.48);
+
+            for (let i = 0; i < numRays; i++) {
+                const ang = (i / numRays) * Math.PI * 2;
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+                let lastHoleR = rEst * 0.5;
+                let pvcStreak = 0;
+
+                for (let r = Math.round(rEst * 0.45); r < maxRayR; r += 2) {
+                    const px = Math.round(cx + cosA * r);
+                    const py = Math.round(cy + sinA * r);
+                    if (esInteriorHueco(px, py)) {
+                        lastHoleR = r;
+                        pvcStreak = 0;
+                    } else {
+                        pvcStreak++;
+                        if (pvcStreak >= 4) break;
+                    }
+                }
+                edgePoints.push({ r: lastHoleR });
+            }
+
+            const sortedR = edgePoints.map(p => p.r).sort((a, b) => a - b);
+            const medianR = sortedR[Math.floor(sortedR.length * 0.5)];
+            let validR = 0, validCount = 0;
+            for (const pt of edgePoints) {
+                if (Math.abs(pt.r - medianR) < medianR * 0.25) {
+                    validR += pt.r; validCount++;
+                }
+            }
+            if (validCount >= 20) {
+                measureX = sx + cx; measureY = sy + cy;
+                measureRadius = Math.max(32, Math.min(Math.min(canvas.width, canvas.height) * 0.42, validR / validCount));
+            }
+        }
+
+        function analizarMuestra() {
+            if (!dibujarFotogramaBase()) {
+                alert("Primero activa la cámara o carga una fotografía.");
+                return;
+            }
+
+            const N = IMGSZ;
+            const half = N / 2;
+            const rPVC = half * 0.88;
+            const srcR = measureRadius / 0.88;
+
+            roiCtx.clearRect(0, 0, N, N);
+            roiCtx.drawImage(canvas, measureX - srcR, measureY - srcR, srcR * 2, srcR * 2, 0, 0, N, N);
+
+            const rgba = roiCtx.getImageData(0, 0, N, N).data;
+            const rawLum = new Float32Array(N * N);
+            const innerVals = [];
+            const pvcRingVals = [];
+
+            for (let y = 0; y < N; y++) {
+                for (let x = 0; x < N; x++) {
+                    const i = y * N + x;
+                    const l = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+                    rawLum[i] = l;
+                    const d = Math.hypot(x - half, y - half);
+                    if (d <= rPVC) {
+                        innerVals.push(l);
+                    } else if (d > rPVC * 1.03 && d < rPVC * 1.13) {
+                        pvcRingVals.push(l);
+                    }
+                }
+            }
+
+            innerVals.sort((a, b) => a - b);
+            const pMin = innerVals[Math.floor(innerVals.length * 0.05)] || 0;
+            const pMax = innerVals[Math.floor(innerVals.length * 0.95)] || 255;
+            const dynRange = Math.max(12, pMax - pMin);
+
+            const lum = new Float32Array(N * N);
+            for (let i = 0; i < rawLum.length; i++) {
+                lum[i] = Math.max(0, Math.min(255, ((rawLum[i] - pMin) / dynRange) * 255));
+            }
+
+            pvcRingVals.sort((a, b) => a - b);
+            const rawPvcMedian = pvcRingVals.length > 0 ? pvcRingVals[Math.floor(pvcRingVals.length * 0.5)] : pMin + 22;
+            const normPvcLum = Math.max(0, Math.min(255, ((rawPvcMedian - pMin) / dynRange) * 255));
+
+            function getLum(px, py) {
+                const ix = Math.max(1, Math.min(N - 2, Math.round(px)));
+                const iy = Math.max(1, Math.min(N - 2, Math.round(py)));
+                return lum[iy * N + ix];
+            }
+
+            const numAngles = 64; 
+            const rMinSearch = Math.round(rPVC * 0.55);
+            const rMaxSearch = Math.round(rPVC * 1.02);
+
+            puntosBordeAlumina = [];
+            puntosAluminio = [];
+
+            for (let a = 0; a < numAngles; a++) {
+                const theta = (a / numAngles) * Math.PI * 2;
+                const cosT = Math.cos(theta);
+                const sinT = Math.sin(theta);
+
+                let bestR = -1;
+                let bestPeakScore = 0;
+
+                for (let r = rMinSearch; r <= rMaxSearch; r++) {
+                    const cx = half + cosT * r;
+                    const cy = half + sinT * r;
+                    const c = getLum(cx, cy);
+
+                    if (c < 100) continue;
+
+                    const lIn4 = getLum(half + cosT * (r - 4), half + sinT * (r - 4));
+                    const lIn7 = getLum(half + cosT * (r - 7), half + sinT * (r - 7));
+                    const lOut3 = getLum(half + cosT * (r + 3), half + sinT * (r + 3));
+                    const lOut5 = getLum(half + cosT * (r + 5), half + sinT * (r + 5));
+
+                    const dropIn = Math.max(c - lIn4, c - lIn7);
+                    const dropOut = Math.max(c - lOut3, c - lOut5);
+
+                    const lDeepIn = (getLum(half + cosT * (r - 5), half + sinT * (r - 5)) + getLum(half + cosT * (r - 9), half + sinT * (r - 9))) / 2;
+                    if (lDeepIn > 190 && lDeepIn >= c - 10) continue;
+
+                    if (dropIn > 12 && dropOut > 12) {
+                        const peakScore = Math.min(dropIn, dropOut) + (dropIn + dropOut) * 0.3;
+                        if (peakScore > bestPeakScore) {
+                            bestPeakScore = peakScore;
+                            bestR = r;
+                        }
+                    }
+                }
+
+                if (bestR > 0 && bestPeakScore > 15) {
+                    const gapHastaPVC = rPVC - bestR;
+                    let sumaGrisDetras = 0, sumaGradienteDetras = 0, muestrasDetras = 0;
+
+                    for (let rOut = bestR + 3; rOut <= rPVC - 1.5; rOut += 1.5) {
+                        const lOut = getLum(half + cosT * rOut, half + sinT * rOut);
+                        const lNext = getLum(half + cosT * (rOut + 1.5), half + sinT * (rOut + 1.5));
+                        sumaGrisDetras += lOut;
+                        sumaGradienteDetras += Math.abs(lOut - lNext);
+                        muestrasDetras++;
+                    }
+
+                    const mediaDetras = muestrasDetras > 0 ? (sumaGrisDetras / muestrasDetras) : normPvcLum;
+                    const rugosidadDetras = muestrasDetras > 0 ? (sumaGradienteDetras / muestrasDetras) : 0;
+
+                    const hayAluminioDetras = (gapHastaPVC >= 4.5) && (muestrasDetras >= 2) && 
+                                              (mediaDetras > Math.max(65, normPvcLum + 12)) && 
+                                              (mediaDetras < 220) && (rugosidadDetras < 35);
+
+                    const screenX = measureX + ((cosT * bestR) / rPVC) * measureRadius;
+                    const screenY = measureY + ((sinT * bestR) / rPVC) * measureRadius;
+
+                    if (hayAluminioDetras) {
+                        puntosAluminio.push({ x: screenX, y: screenY, angleIndex: a });
+                    } else if (gapHastaPVC <= 10) {
+                        puntosBordeAlumina.push({ x: screenX, y: screenY, angleIndex: a });
+                    }
+                }
+            }
+
+            const numBordeAlumina = puntosBordeAlumina.length;
+            const numAluminio = puntosAluminio.length;
+            const totalPuntos = numBordeAlumina + numAluminio;
+            const porcentajePVC = totalPuntos > 0 ? Math.round((numBordeAlumina / totalPuntos) * 100) : 0;
+
+            pctPvcText.textContent = `Borde alumina: ${porcentajePVC}% (${numBordeAlumina}/${totalPuntos})`;
+
+            if (totalPuntos < 4) {
+                statusText.textContent = "⚠️ ACERCA O ENFOCA EL AGUJERO";
+                statusText.className = "buscando";
+                debugText.textContent = "Borde de alumina no detectado claramente";
+            } else if (numAluminio >= 3 || porcentajePVC < minPorcentajePVC) {
+                statusText.textContent = "❌ DESCENTRADA";
+                statusText.className = "descentrada";
+                debugText.textContent = `Detectado Aluminio tras la membrana`;
+            } else {
+                statusText.textContent = "✅ CENTRADA";
+                statusText.className = "centrada";
+                debugText.textContent = `Borde alumina correcto junto al PVC`;
+            }
+
+            comprobacionActiva = true;
+        }
+
+        document.getElementById('btn-comprobar').addEventListener('click', () => {
+            if (!isVideoPlaying && !staticImage) {
+                alert("Primero activa la cámara o carga una fotografía.");
+                return;
+            }
+            if (autoSnapPVC) autoAjustarAlHuecoPVC();
+            analizarMuestra();
+        });
+
+        function renderLoop() {
+            dibujarFotogramaBase();
+
+            ctx.beginPath();
+            ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = comprobacionActiva ? (statusText.className === 'centrada' ? '#32d74b' : '#ff453a') : '#0a84ff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            if (comprobacionActiva) {
+                ctx.fillStyle = '#00f5d4';
+                for (const p of puntosBordeAlumina) {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2); ctx.fill();
+                }
+
+                ctx.fillStyle = '#ff453a';
+                for (const p of puntosAluminio) {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 4.8, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            ctx.beginPath();
+            ctx.arc(measureX + measureRadius, measureY, 12, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffd60a'; ctx.fill();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+
+            reqAnimFrame = requestAnimationFrame(renderLoop);
+        }
+        
+        renderLoop();
+    </script>
+</body>
+</html>
