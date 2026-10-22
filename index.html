@@ -2,177 +2,162 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Detector NAA - Cámara Trasera y Móvil</title>
+    <!-- Viewport adaptativo para móviles: deshabilita zoom y se ajusta a la pantalla -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Detector NAA - Cámara Frontal (Móvil)</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-bg: #1e1e1e;
+            --bg-color: #000000;
+            --panel-bg: #1a1a1a;
             --text-color: #ffffff;
             --accent-color: #007bff;
-            --danger-color: #dc3545;
-            --success-color: #28a745;
+            --danger-color: #ff3b30;
+            --success-color: #34c759;
+            --warning-color: #ffcc00;
         }
 
-        body {
+        body, html {
             margin: 0;
             padding: 0;
+            width: 100%;
+            height: 100%;
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; /* Evita cualquier scroll en la pantalla del móvil */
             display: flex;
             flex-direction: column;
-            align-items: center;
-            /* Altura dinámica para evitar que la barra de navegación del móvil oculte botones */
-            min-height: 100vh; 
-            overflow: hidden;
         }
 
+        /* 1. Header Fijo superior */
         #header {
             width: 100%;
-            padding: 15px 0;
+            padding: 10px 0;
             text-align: center;
             background-color: var(--panel-bg);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-            z-index: 10;
+            z-index: 20;
+            flex-shrink: 0;
         }
 
-        h1 { margin: 0; font-size: 1.2rem; font-weight: normal; }
+        h1 { margin: 0; font-size: 1.1rem; font-weight: 500; }
 
+        /* 2. Contenedor principal de la cámara (Ocupa todo el espacio restante) */
         #main-container {
             flex-grow: 1;
+            position: relative;
             width: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
+            background-color: #000;
             overflow: hidden;
         }
 
         #video-element { display: none; }
 
-        #canvas-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            /* Usamos la altura completa disponible para maximizar el visor en móviles */
-            height: 100%; 
-            background-color: #000;
-        }
-
+        /* El Canvas ocupará el 100% del contenedor padre */
         #main-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            display: block;
+            object-fit: cover; /* Adapta el video llenando toda la pantalla sin distorsión */
             touch-action: none;
         }
 
+        /* 3. Textos flotantes sobre la cámara */
         #status-overlay {
             position: absolute;
-            top: 10px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px 20px;
-            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.75);
+            padding: 12px 24px;
+            border-radius: 12px;
             text-align: center;
             pointer-events: none;
-            width: 80%;
-            max-width: 300px; /* Evita que sea excesivamente ancho */
+            z-index: 10;
+            backdrop-filter: blur(4px);
         }
 
         #status-text {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             font-weight: bold;
             margin: 0;
+            letter-spacing: 1px;
         }
 
         #status-text.centrada { color: var(--success-color); }
         #status-text.descentrada { color: var(--danger-color); }
-        #status-text.buscando { color: #ffc107; }
+        #status-text.buscando { color: var(--warning-color); }
 
-        /* Controles adaptables (Responsive) */
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.85);
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0px 1px 3px rgba(0,0,0,0.8);
+        }
+
+        /* 4. Panel inferior de botones */
         #controls {
             width: 100%;
             background-color: var(--panel-bg);
-            padding: 15px;
+            padding: 12px;
             display: flex;
-            justify-content: center;
-            gap: 15px;
+            justify-content: space-around;
+            gap: 10px;
             box-sizing: border-box;
-            z-index: 10;
-            flex-wrap: wrap; /* Permite que los botones pasen a la siguiente línea si no caben */
+            z-index: 20;
+            flex-shrink: 0;
         }
 
         .btn {
             background-color: var(--accent-color);
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            font-size: 1rem;
+            padding: 14px 10px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: bold;
             cursor: pointer;
-            transition: background-color 0.2s;
-            flex: 1; /* Los botones crecen para ocupar el espacio */
-            min-width: 150px; /* Anchura mínima antes de saltar de línea */
-            max-width: 300px;
+            flex: 1; /* Ocupan mitades iguales de la pantalla */
             text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
 
-        .btn:hover { background-color: #0056b3; }
-        .btn:active { transform: scale(0.98); }
-
+        .btn:active { background-color: #0056b3; transform: scale(0.97); }
         #file-input { display: none; }
-        
-        .instructions {
-            position: absolute;
-            bottom: 10px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.7);
-            pointer-events: none;
-            padding: 0 10px;
-            box-sizing: border-box;
-        }
-
-        /* Media Query para pantallas muy estrechas (móviles en vertical) */
-        @media (max-width: 400px) {
-            #controls {
-                flex-direction: column; /* Apila los botones uno encima de otro */
-                padding: 10px;
-                gap: 10px;
-            }
-            .btn {
-                max-width: 100%; /* El botón ocupa todo el ancho */
-            }
-        }
     </style>
 </head>
 <body>
 
     <div id="header">
-        <h1>NAA Align (Cámara Trasera)</h1>
+        <h1>Alineación NAA (Cámara Frontal)</h1>
     </div>
 
     <div id="main-container">
-        <div id="canvas-container">
-            <video id="video-element" autoplay playsinline></video>
-            <canvas id="main-canvas"></canvas>
-            
-            <div id="status-overlay">
-                <p id="status-text" class="buscando">INICIANDO...</p>
-                <p id="debug-text" style="font-size: 0.8rem; margin-top:5px; color:#ccc;">Calculando cortes</p>
-            </div>
-            
-            <div class="instructions">Arrastra el círculo amarillo al agujero. Tira del borde para el tamaño.</div>
+        <video id="video-element" autoplay playsinline></video>
+        <!-- Canvas donde se dibuja el video y el procesamiento -->
+        <canvas id="main-canvas"></canvas>
+        
+        <div id="status-overlay">
+            <p id="status-text" class="buscando">INICIANDO...</p>
+            <p id="debug-text" style="font-size: 0.85rem; margin-top:5px; color:#ccc;">Métricas: --</p>
         </div>
+        
+        <div class="instructions">👆 Arrastra el círculo al agujero. Tira del punto amarillo para ajustar el tamaño.</div>
     </div>
 
     <div id="controls">
-        <button id="btn-camera" class="btn">Activar Cámara</button>
-        <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">Cargar Imagen</button>
+        <button id="btn-camera" class="btn">Activar Cámara Frontal</button>
+        <button id="btn-image" class="btn" style="background-color: #555;" onclick="document.getElementById('file-input').click()">📁 Cargar Foto</button>
         <input type="file" id="file-input" accept="image/*">
     </div>
 
@@ -189,6 +174,7 @@
         let staticImage = null;
         let reqAnimFrame;
 
+        // Variables del O-ring
         let measureX = 0;
         let measureY = 0;
         let measureRadius = 50;
@@ -198,11 +184,14 @@
         let dragOffsetX = 0;
         let dragOffsetY = 0;
 
+        // Función para ajustar el tamaño del canvas interno al tamaño real del contenedor
         function resizeCanvas() {
-            const container = document.getElementById('canvas-container');
+            const container = document.getElementById('main-container');
+            // Damos al canvas la resolución real de la pantalla del dispositivo
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
             
+            // Centrar el anillo la primera vez que se carga
             if (measureX === 0) {
                 measureX = canvas.width / 2;
                 measureY = canvas.height / 2;
@@ -210,8 +199,10 @@
             }
         }
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-        
+        // Pequeño retardo al iniciar para asegurar que el DOM ha calculado el tamaño
+        setTimeout(resizeCanvas, 100);
+
+        // Control táctil
         function getPointerPos(e) {
             const rect = canvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -233,7 +224,7 @@
             const dy = pos.y - measureY;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            const edgeTolerance = 30; // Aumentado un poco para facilitar el toque en móvil
+            const edgeTolerance = 35; // Amplio margen táctil para el móvil
 
             if (Math.abs(dist - measureRadius) < edgeTolerance) {
                 isResizing = true;
@@ -256,7 +247,7 @@
             } else if (isResizing) {
                 const dx = pos.x - measureX;
                 const dy = pos.y - measureY;
-                measureRadius = Math.max(30, Math.sqrt(dx*dx + dy*dy));
+                measureRadius = Math.max(40, Math.sqrt(dx*dx + dy*dy));
             }
         });
 
@@ -265,13 +256,13 @@
             isResizing = false;
         });
 
-        // ACTIVA LA CÁMARA TRASERA
+        // 1. SOLUCIÓN CÁMARA FRONTAL
         btnCamera.addEventListener('click', async () => {
             staticImage = null;
             try {
-                // Se solicita específicamente "environment" (cámara trasera)
+                // facingMode: "user" fuerza el uso de la cámara frontal de selfies en móviles
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
                 });
                 video.srcObject = stream;
                 video.play();
@@ -279,7 +270,7 @@
                 if (!reqAnimFrame) processFrame();
             } catch (err) {
                 console.error("Error cámara:", err);
-                alert("No se pudo acceder a la cámara trasera. Asegúrate de dar permisos.");
+                alert("Error al abrir cámara frontal. Permite el acceso en tu navegador.");
             }
         });
 
@@ -304,30 +295,40 @@
             reader.readAsDataURL(file);
         });
 
+        // 2. PROCESAMIENTO Y VISIÓN COMPUTACIONAL
         function processFrame() {
+            // Dibujar cámara o imagen ajustando los recortes (object-fit: cover casero)
             if (isVideoPlaying && video.readyState === video.HAVE_ENOUGH_DATA) {
                 const hRatio = canvas.width / video.videoWidth;
                 const vRatio = canvas.height / video.videoHeight;
-                const ratio = Math.max(hRatio, vRatio);
+                const ratio = Math.max(hRatio, vRatio); // Max = Cover
                 const centerShift_x = (canvas.width - video.videoWidth * ratio) / 2;
-                const centerShift_y = (canvas.height - video.videoHeight * ratio) / 2;  
-                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, centerShift_x, centerShift_y, video.videoWidth * ratio, video.videoHeight * ratio);
+                const centerShift_y = (canvas.height - video.videoHeight * ratio) / 2;
+                
+                // Efecto espejo (flip horizontal) muy útil al usar cámara frontal para manipular muestras
+                ctx.save();
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, -centerShift_x, centerShift_y, video.videoWidth * ratio, video.videoHeight * ratio);
+                ctx.restore();
+
             } else if (staticImage) {
                 const hRatio = canvas.width / staticImage.width;
                 const vRatio = canvas.height / staticImage.height;
-                const ratio = Math.min(hRatio, vRatio);
+                const ratio = Math.min(hRatio, vRatio); // Min = Fit para fotos enteras
                 const centerShift_x = (canvas.width - staticImage.width * ratio) / 2;
                 const centerShift_y = (canvas.height - staticImage.height * ratio) / 2;  
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0,0, canvas.width, canvas.height);
                 ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, centerShift_x, centerShift_y, staticImage.width * ratio, staticImage.height * ratio);
             } else {
-                ctx.fillStyle = '#1e1e1e';
+                ctx.fillStyle = '#111';
                 ctx.fillRect(0,0, canvas.width, canvas.height);
                 reqAnimFrame = requestAnimationFrame(processFrame);
                 return;
             }
 
+            // LÍMITES DE ESCANEO
             const startX = Math.max(0, measureX - measureRadius);
             const startY = Math.max(0, measureY - measureRadius);
             const endX = Math.min(canvas.width, measureX + measureRadius);
@@ -342,14 +343,15 @@
                 let puntosCortantes = 0; 
                 let puntosBorde = 0;     
                 let totalPixelesNucleo = 0;
-
                 const radioNucleo = measureRadius * 0.70; 
                 
+                // Conversión Escala Grises
                 const grises = new Uint8Array(width * height);
                 for (let i = 0; i < data.length; i += 4) {
                     grises[i/4] = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
                 }
 
+                // Escaneo de vecinos
                 for (let y = 1; y < height - 1; y += 2) {
                     for (let x = 1; x < width - 1; x += 2) {
                         const canvasX = startX + x;
@@ -361,6 +363,7 @@
                         if (dist <= measureRadius) {
                             const idx = y * width + x;
                             const centerPx = grises[idx];
+                            // Operador Laplaciano para localizar el salto del óxido
                             const laplacian = Math.abs(
                                 4 * centerPx 
                                 - grises[idx - 1] 
@@ -372,11 +375,11 @@
                             if (laplacian > 60 && centerPx > 100) { 
                                 if (dist < radioNucleo) {
                                     puntosCortantes++;
-                                    ctx.fillStyle = 'rgba(255,0,0,0.5)';
+                                    ctx.fillStyle = 'rgba(255,0,0,0.6)';
                                     ctx.fillRect(canvasX, canvasY, 2, 2);
                                 } else {
                                     puntosBorde++;
-                                    ctx.fillStyle = 'rgba(0,255,0,0.3)';
+                                    ctx.fillStyle = 'rgba(0,255,0,0.4)';
                                     ctx.fillRect(canvasX, canvasY, 2, 2);
                                 }
                             }
@@ -388,8 +391,9 @@
 
                 const densidadCorte = totalPixelesNucleo > 0 ? (puntosCortantes / totalPixelesNucleo) * 100 : 0;
                 
-                debugText.textContent = `Pixeles cortando centro: ${puntosCortantes} (${densidadCorte.toFixed(2)}%)`;
+                debugText.textContent = `Corte centro: ${densidadCorte.toFixed(2)}% | Perímetro: ${puntosBorde}px`;
 
+                // CRITERIO FINAL
                 if (densidadCorte > 0.4) { 
                     statusText.textContent = "DESCENTRADA";
                     statusText.className = "descentrada";
@@ -402,26 +406,28 @@
                 }
             }
 
+            // DIBUJO DE GUÍAS (O-Ring)
             ctx.beginPath();
             ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
-            ctx.strokeStyle = 'yellow';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 235, 59, 0.9)'; // Amarillo
+            ctx.lineWidth = 2.5;
             ctx.stroke();
 
             ctx.beginPath();
             ctx.arc(measureX, measureY, measureRadius * 0.70, 0, 2 * Math.PI);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.setLineDash([6, 6]);
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.setLineDash([]); 
 
+            // Tirador para redimensionar (Punto amarillo sólido)
             ctx.beginPath();
-            ctx.arc(measureX + measureRadius, measureY, 12, 0, 2 * Math.PI); // Tirador un poco más grande
-            ctx.fillStyle = 'rgba(255,255,0,0.8)';
+            ctx.arc(measureX + measureRadius, measureY, 15, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 235, 59, 0.8)';
             ctx.fill();
             ctx.strokeStyle = 'black';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
             reqAnimFrame = requestAnimationFrame(processFrame);
