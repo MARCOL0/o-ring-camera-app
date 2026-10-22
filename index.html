@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Alineador NAA - Luna Creciente y PVC</title>
+    <title>Alineador NAA - Detección de Aluminio Opaco</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -43,7 +43,7 @@
             border-bottom: 1px solid #27272a;
         }
 
-        h1 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+        h1 { margin: 0; font-size: 0.92rem; font-weight: 600; }
 
         #main-container {
             flex-grow: 1;
@@ -79,11 +79,11 @@
             backdrop-filter: blur(6px);
             border: 1px solid rgba(255,255,255,0.18);
             width: 92%;
-            max-width: 390px;
+            max-width: 395px;
         }
 
         #status-text {
-            font-size: 1.35rem;
+            font-size: 1.32rem;
             font-weight: 800;
             margin: 0;
         }
@@ -93,7 +93,7 @@
         #status-text.buscando { color: var(--warning-color); font-size: 1.05rem; }
 
         #pct-pvc-text {
-            font-size: 1.05rem;
+            font-size: 1.02rem;
             font-weight: 700;
             margin: 6px 0 2px 0;
             color: var(--cyan-color);
@@ -181,7 +181,7 @@
 
     <div id="header">
         <h1>🔬 Alineador NAA</h1>
-        <span style="font-size: 0.72rem; color: #00f5d4;">● Junto a PVC &nbsp; <span style="color:#ff9f0a;">● Aluminio crudo</span></span>
+        <span style="font-size: 0.72rem; color: #00f5d4;">● Junto a PVC &nbsp; <span style="color:#ff453a;">● Aluminio opaco</span></span>
     </div>
 
     <div id="main-container">
@@ -192,7 +192,7 @@
             <p id="status-text" class="buscando">TOCA EL AGUJERO Y PULSA COMPROBAR</p>
             <p id="pct-pvc-text">Puntos blancos junto al PVC: --%</p>
             <p id="debug-text" style="font-size: 0.75rem; margin: 2px 0 0 0; color:#cbd5e1;">
-                Detecta luna creciente y aluminio sin anodizar
+                Filtra reflejos de luz y detecta aluminio opaco
             </p>
         </div>
 
@@ -203,9 +203,9 @@
 
     <div id="controls">
         <div class="param-bar">
-            <span>Mínimo junto al PVC para OK:</span>
-            <input type="range" id="slider-min-pvc" min="35" max="80" value="55">
-            <span id="val-min-pvc">55%</span>
+            <span>Exigencia junto al PVC:</span>
+            <input type="range" id="slider-min-pvc" min="55" max="95" value="80">
+            <span id="val-min-pvc">80%</span>
         </div>
         <button id="btn-comprobar" class="btn btn-check">COMPROBAR</button>
         <div class="row-buttons">
@@ -242,7 +242,7 @@
         let measureRadius = 70;
 
         let autoSnapPVC = true;
-        let minPorcentajePVC = 55; // Si >= 55% de puntos blancos están junto al PVC (sin aluminio crudo detrás), es CENTRADA
+        let minPorcentajePVC = 80;
 
         let isDragging = false;
         let isResizing = false;
@@ -251,7 +251,7 @@
 
         let comprobacionActiva = false;
         let puntosJuntoPVC = [];
-        let puntosConAluminioCrudo = [];
+        let puntosConAluminioOpaco = [];
 
         sliderMinPvc.addEventListener('input', (e) => {
             minPorcentajePVC = parseInt(e.target.value, 10);
@@ -409,7 +409,7 @@
             return false;
         }
 
-        // PASO 1: ENCAJAR EL CÍRCULO EN EL HUECO DE PVC NEGRO OSCURO
+        // PASO 1: ENCAJAR EL CÍRCULO EN EL HUECO DE PVC NEGRO
         function autoAjustarAlHuecoPVC() {
             dibujarFotogramaBase();
 
@@ -417,341 +417,4 @@
             const sx = Math.max(0, Math.round(measureX - searchR));
             const sy = Math.max(0, Math.round(measureY - searchR));
             const sw = Math.min(canvas.width - sx, searchR * 2);
-            const sh = Math.min(canvas.height - sy, searchR * 2);
-            if (sw < 40 || sh < 40) return;
-
-            const rgba = ctx.getImageData(sx, sy, sw, sh).data;
-            const lum = new Float32Array(sw * sh);
-            for (let i = 0; i < sw * sh; i++) {
-                lum[i] = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
-            }
-
-            const pvcSamples = [];
-            for (let y = 3; y < sh - 3; y += 2) {
-                for (let x = 3; x < sw - 3; x += 2) {
-                    const dist = Math.hypot((sx + x) - measureX, (sy + y) - measureY);
-                    if (dist > measureRadius * 0.95 && dist < searchR * 0.95) {
-                        const l = lum[y * sw + x];
-                        const diffLocal = Math.abs(l - lum[y * sw + (x - 2)]) + Math.abs(l - lum[(y - 2) * sw + x]);
-                        if (l > 20 && l < 115 && diffLocal < 15) {
-                            pvcSamples.push(l);
-                        }
-                    }
-                }
-            }
-
-            pvcSamples.sort((a, b) => a - b);
-            const pvcLum = pvcSamples.length > 10
-                ? pvcSamples[Math.floor(pvcSamples.length * 0.5)]
-                : 65;
-
-            function esInteriorHueco(px, py) {
-                if (px < 2 || px >= sw - 2 || py < 2 || py >= sh - 2) return false;
-                const l = lum[py * sw + px];
-                const grad = Math.abs(lum[py * sw + (px + 2)] - lum[py * sw + (px - 2)]) +
-                             Math.abs(lum[(py + 2) * sw + px] - lum[(py - 2) * sw + px]);
-                return Math.abs(l - pvcLum) > 15 || grad > 20;
-            }
-
-            let cx = measureX - sx;
-            let cy = measureY - sy;
-            let rEst = measureRadius;
-
-            for (let iter = 0; iter < 3; iter++) {
-                let sumX = 0, sumY = 0, count = 0;
-                const scanR = rEst * 1.1;
-                for (let y = Math.max(2, Math.floor(cy - scanR)); y < Math.min(sh - 2, Math.ceil(cy + scanR)); y += 2) {
-                    for (let x = Math.max(2, Math.floor(cx - scanR)); x < Math.min(sw - 2, Math.ceil(cx + scanR)); x += 2) {
-                        if (Math.hypot(x - cx, y - cy) <= scanR && esInteriorHueco(x, y)) {
-                            sumX += x;
-                            sumY += y;
-                            count++;
-                        }
-                    }
-                }
-                if (count > 30) {
-                    cx = cx * 0.3 + (sumX / count) * 0.7;
-                    cy = cy * 0.3 + (sumY / count) * 0.7;
-                }
-            }
-
-            const numRays = 64;
-            const edgePoints = [];
-            const maxRayR = Math.min(searchR * 0.95, Math.min(sw, sh) * 0.48);
-
-            for (let i = 0; i < numRays; i++) {
-                const ang = (i / numRays) * Math.PI * 2;
-                const cosA = Math.cos(ang);
-                const sinA = Math.sin(ang);
-
-                let lastHoleR = rEst * 0.5;
-                let pvcStreak = 0;
-
-                for (let r = Math.round(rEst * 0.45); r < maxRayR; r += 2) {
-                    const px = Math.round(cx + cosA * r);
-                    const py = Math.round(cy + sinA * r);
-                    if (esInteriorHueco(px, py)) {
-                        lastHoleR = r;
-                        pvcStreak = 0;
-                    } else {
-                        pvcStreak++;
-                        if (pvcStreak >= 4) break;
-                    }
-                }
-                edgePoints.push({ r: lastHoleR });
-            }
-
-            const sortedR = edgePoints.map(p => p.r).sort((a, b) => a - b);
-            const medianR = sortedR[Math.floor(sortedR.length * 0.5)];
-
-            let validR = 0, validCount = 0;
-            for (const pt of edgePoints) {
-                if (Math.abs(pt.r - medianR) < medianR * 0.25) {
-                    validR += pt.r;
-                    validCount++;
-                }
-            }
-
-            if (validCount >= 20) {
-                measureX = sx + cx;
-                measureY = sy + cy;
-                measureRadius = Math.max(32, Math.min(Math.min(canvas.width, canvas.height) * 0.42, validR / validCount));
-            }
-        }
-
-        // PASO 2: ANALIZAR PUNTOS BLANCOS, LUNA CRECIENTE Y ALUMINIO SIN ANODIZAR
-        function analizarMuestra() {
-            if (!dibujarFotogramaBase()) {
-                alert("Primero activa la cámara o carga una fotografía.");
-                return;
-            }
-
-            const N = IMGSZ;
-            const half = N / 2;
-            const rPVC = half * 0.88; // Radio del borde de PVC en la matriz 160x160
-            const srcR = measureRadius / 0.88;
-
-            roiCtx.clearRect(0, 0, N, N);
-            roiCtx.drawImage(
-                canvas,
-                measureX - srcR, measureY - srcR, srcR * 2, srcR * 2,
-                0, 0, N, N
-            );
-
-            const rgba = roiCtx.getImageData(0, 0, N, N).data;
-            const rawLum = new Float32Array(N * N);
-            const innerVals = [];
-            const pvcRingVals = [];
-
-            for (let y = 0; y < N; y++) {
-                for (let x = 0; x < N; x++) {
-                    const i = y * N + x;
-                    const l = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
-                    rawLum[i] = l;
-                    const d = Math.hypot(x - half, y - half);
-                    if (d <= rPVC) {
-                        innerVals.push(l);
-                    } else if (d > rPVC * 1.02 && d < rPVC * 1.12) {
-                        pvcRingVals.push(l);
-                    }
-                }
-            }
-
-            innerVals.sort((a, b) => a - b);
-            const pMin = innerVals[Math.floor(innerVals.length * 0.05)] || 0;
-            const pMax = innerVals[Math.floor(innerVals.length * 0.95)] || 255;
-            const dynRange = Math.max(12, pMax - pMin);
-
-            const lum = new Float32Array(N * N);
-            for (let i = 0; i < rawLum.length; i++) {
-                lum[i] = Math.max(0, Math.min(255, ((rawLum[i] - pMin) / dynRange) * 255));
-            }
-
-            // Luminancia media normalizada del plástico PVC negro exterior
-            pvcRingVals.sort((a, b) => a - b);
-            const rawPvcMedian = pvcRingVals.length > 0 ? pvcRingVals[Math.floor(pvcRingVals.length * 0.5)] : pMin + 25;
-            const normPvcLum = Math.max(0, Math.min(255, ((rawPvcMedian - pMin) / dynRange) * 255));
-
-            // 1. Detectar los Puntos Blancos (ignorando el reflejo ancho del espejo central)
-            const spotCandidates = [];
-            for (let y = 5; y < N - 5; y++) {
-                for (let x = 5; x < N - 5; x++) {
-                    const dx = x - half;
-                    const dy = y - half;
-                    const dist = Math.hypot(dx, dy);
-                    // Buscamos en todo el interior y el borde del PVC
-                    if (dist > rPVC * 1.06 || dist < rPVC * 0.18) continue;
-
-                    const c = lum[y * N + x];
-                    if (c < 105) continue;
-
-                    let bestSym = 0;
-                    for (const k of [2, 4]) {
-                        const symH = Math.min(c - lum[y * N + (x - k)], c - lum[y * N + (x + k)]);
-                        const symV = Math.min(c - lum[(y - k) * N + x], c - lum[(y + k) * N + x]);
-                        const symD1 = Math.min(c - lum[(y - k) * N + (x - k)], c - lum[(y + k) * N + (x + k)]);
-                        const symD2 = Math.min(c - lum[(y - k) * N + (x + k)], c - lum[(y + k) * N + (x - k)]);
-
-                        const axes = [symH, symV, symD1, symD2].sort((a, b) => b - a);
-                        const scoreK = (axes[0] + axes[1]) * 0.5;
-                        if (scoreK > bestSym) bestSym = scoreK;
-                    }
-
-                    if (bestSym > 14) {
-                        spotCandidates.push({ x, y, dx, dy, dist, score: bestSym });
-                    }
-                }
-            }
-
-            spotCandidates.sort((a, b) => b.score - a.score);
-            const whiteDots = [];
-            for (const cand of spotCandidates) {
-                if (whiteDots.length >= 60) break;
-                let close = false;
-                for (const sel of whiteDots) {
-                    if (Math.hypot(cand.x - sel.x, cand.y - sel.y) < 5) {
-                        close = true;
-                        break;
-                    }
-                }
-                if (!close) whiteDots.push(cand);
-            }
-
-            // 2. Clasificar cada Punto Blanco:
-            //    ¿Está junto al PVC (permitiendo luna creciente suave) o deja detrás aluminio sin anodizar ni pulir?
-            puntosJuntoPVC = [];
-            puntosConAluminioCrudo = [];
-
-            for (const pt of whiteDots) {
-                const ang = Math.atan2(pt.dy, pt.dx);
-                const cosA = Math.cos(ang);
-                const sinA = Math.sin(ang);
-
-                // Analizar los píxeles situados DETRÁS del punto blanco (entre el punto blanco y la pared de PVC)
-                let pixelesAluminioCrudo = 0;
-                let pasosTotales = 0;
-
-                for (let r = pt.dist + 3; r <= rPVC * 0.96; r += 2) {
-                    const rx = Math.round(half + cosA * r);
-                    const ry = Math.round(half + sinA * r);
-                    if (rx < 2 || rx >= N - 2 || ry < 2 || ry >= N - 2) continue;
-
-                    const l = lum[ry * N + rx];
-                    // El aluminio sin anodizar ni pulir es gris metálico mate (más claro que el PVC negro y que la sombra del O-ring,
-                    // pero sin llegar al blanco saturado de un reflejo especular directo)
-                    const diffVecinos = Math.abs(l - lum[ry * N + (rx - 1)]) + Math.abs(l - lum[(ry - 1) * N + rx]);
-                    const esAluminioSinAnodizar = (l > Math.max(75, normPvcLum + 22)) && (l < 215) && (diffVecinos < 28);
-
-                    if (esAluminioSinAnodizar) {
-                        pixelesAluminioCrudo++;
-                    }
-                    pasosTotales++;
-                }
-
-                const screenX = measureX + (pt.dx / rPVC) * measureRadius;
-                const screenY = measureY + (pt.dy / rPVC) * measureRadius;
-
-                // Margen amplio para permitir el efecto de luna creciente/decreciente:
-                // Es válido si está a más del 50% del radio y NO tiene una franja gruesa de aluminio crudo detrás (máximo 4 pasos = ~8 px)
-                const tieneFranjaAluminioCrudo = (pixelesAluminioCrudo >= 4) || (pt.dist < rPVC * 0.50);
-
-                if (!tieneFranjaAluminioCrudo) {
-                    puntosJuntoPVC.push({ x: screenX, y: screenY });
-                } else {
-                    puntosConAluminioCrudo.push({ x: screenX, y: screenY });
-                }
-            }
-
-            // 3. Calcular el porcentaje de puntos blancos al lado del agujero de PVC
-            const totalPuntos = puntosJuntoPVC.length + puntosConAluminioCrudo.length;
-            const porcentajePVC = totalPuntos > 0
-                ? Math.round((puntosJuntoPVC.length / totalPuntos) * 100)
-                : 0;
-
-            pctPvcText.textContent = `Puntos blancos junto al PVC: ${porcentajePVC}% (${puntosJuntoPVC.length}/${totalPuntos})`;
-
-            if (totalPuntos < 4) {
-                statusText.textContent = "⚠️ ACERCA O ENFOCA EL AGUJERO";
-                statusText.className = "buscando";
-                debugText.textContent = "Pocos puntos detectados en el borde";
-            } else if (porcentajePVC >= minPorcentajePVC) {
-                statusText.textContent = "✅ MUESTRA CENTRADA";
-                statusText.className = "centrada";
-                debugText.textContent = `Mayoría junto al PVC (luna creciente admisible)`;
-            } else {
-                statusText.textContent = "❌ MUESTRA DESCENTRADA";
-                statusText.className = "descentrada";
-                debugText.textContent = `Detectado aluminio sin anodizar tras los puntos blancos (${puntosConAluminioCrudo.length} pts)`;
-            }
-
-            comprobacionActiva = true;
-        }
-
-        document.getElementById('btn-comprobar').addEventListener('click', () => {
-            if (!isVideoPlaying && !staticImage) {
-                alert("Primero activa la cámara o carga una fotografía.");
-                return;
-            }
-            if (autoSnapPVC) {
-                autoAjustarAlHuecoPVC();
-            }
-            analizarMuestra();
-        });
-
-        function renderLoop() {
-            dibujarFotogramaBase();
-
-            // Dibujar contorno del hueco de PVC negro
-            ctx.beginPath();
-            ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
-            ctx.strokeStyle = comprobacionActiva
-                ? (statusText.className === 'centrada' ? '#32d74b' : '#ff453a')
-                : '#0a84ff';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            // Dibujar banda orientativa de luna creciente admisible (50% del radio)
-            if (!comprobacionActiva) {
-                ctx.beginPath();
-                ctx.arc(measureX, measureY, measureRadius * 0.50, 0, 2 * Math.PI);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-                ctx.setLineDash([5, 5]);
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
-
-            if (comprobacionActiva) {
-                // Puntos blancos situados al lado del PVC (Cian)
-                ctx.fillStyle = '#00f5d4';
-                for (const p of puntosJuntoPVC) {
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                // Puntos blancos con aluminio sin anodizar detrás (Naranja/Rojo)
-                ctx.fillStyle = '#ff9f0a';
-                for (const p of puntosConAluminioCrudo) {
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-
-            // Tirador amarillo para ajustar el tamaño manualmente si se desea
-            ctx.beginPath();
-            ctx.arc(measureX + measureRadius, measureY, 12, 0, 2 * Math.PI);
-            ctx.fillStyle = '#ffd60a';
-            ctx.fill();
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            reqAnimFrame = requestAnimationFrame(renderLoop);
-        }
-
-        renderLoop();
-    </script>
-</body>
-</html>
+            const sh = Math.min(canvas.height - sy, searchR *
