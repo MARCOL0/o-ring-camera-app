@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Detector NAA - Visión Computacional</title>
+    <title>Alineador NAA - Detección por PVC Negro</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -13,6 +13,7 @@
             --danger-color: #ff453a;
             --success-color: #32d74b;
             --warning-color: #ffd60a;
+            --cyan-color: #00f5d4;
         }
 
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
@@ -69,7 +70,7 @@
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(15, 15, 20, 0.88);
+            background-color: rgba(15, 15, 20, 0.90);
             padding: 10px 16px;
             border-radius: 12px;
             text-align: center;
@@ -77,8 +78,8 @@
             z-index: 10;
             backdrop-filter: blur(6px);
             border: 1px solid rgba(255,255,255,0.15);
-            width: 90%;
-            max-width: 360px;
+            width: 92%;
+            max-width: 380px;
         }
 
         #status-text {
@@ -96,12 +97,12 @@
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            width: 92%;
+            width: 94%;
             text-align: center;
             font-size: 0.78rem;
-            color: rgba(255,255,255,0.9);
-            background: rgba(0,0,0,0.65);
-            padding: 6px 10px;
+            color: rgba(255,255,255,0.95);
+            background: rgba(0,0,0,0.75);
+            padding: 7px 12px;
             border-radius: 20px;
             pointer-events: none;
             z-index: 10;
@@ -141,19 +142,24 @@
             background-color: #27272a;
             color: white;
             border: 1px solid #3f3f46;
-            padding: 11px 8px;
+            padding: 10px 8px;
             border-radius: 8px;
-            font-size: 0.88rem;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             flex: 1;
             text-align: center;
         }
 
+        .btn.active-mode {
+            background-color: #1d4ed8;
+            border-color: #3b82f6;
+        }
+
         .btn-check {
             background-color: var(--accent-color);
             border: none;
-            font-size: 1rem;
+            font-size: 0.96rem;
             font-weight: 700;
             padding: 13px;
             box-shadow: 0 3px 10px rgba(10, 132, 255, 0.35);
@@ -166,8 +172,8 @@
 <body>
 
     <div id="header">
-        <h1>🔬 Alineador NAA (Espejo / Top-Hat)</h1>
-        <span id="res-badge" style="font-size: 0.75rem; color: #a1a1aa;">imgsz: 160x160</span>
+        <h1>🔬 Alineador NAA (Referencia PVC Negro)</h1>
+        <span style="font-size: 0.72rem; color: #00f5d4;">● Puntos Blancos</span>
     </div>
 
     <div id="main-container">
@@ -175,27 +181,28 @@
         <canvas id="main-canvas"></canvas>
 
         <div id="status-overlay">
-            <p id="status-text" class="buscando">AJUSTA EL ANILLO Y PULSA COMPROBAR</p>
+            <p id="status-text" class="buscando">TOCA EL HUECO DE LA CELDA</p>
             <p id="debug-text" style="font-size: 0.78rem; margin: 4px 0 0 0; color:#cbd5e1;">
-                Auto-exposición y detector Shi-Tomasi listos
+                El círculo se ajustará solo al plástico negro de PVC
             </p>
         </div>
 
         <div class="instructions" id="inst-text">
-            👆 Arrastra el círculo al agujero | Tira del punto amarillo para el tamaño
+            👆 Toca dentro del agujero: el anillo se encaja solo en el PVC negro
         </div>
     </div>
 
     <div id="controls">
         <div class="param-bar">
-            <span>Sensibilidad (qualityLevel):</span>
-            <input type="range" id="slider-quality" min="10" max="45" value="22">
-            <span id="val-quality">0.22</span>
+            <span>Tolerancia admitida:</span>
+            <input type="range" id="slider-tol" min="10" max="40" value="25">
+            <span id="val-tol">25%</span>
         </div>
-        <button id="btn-comprobar" class="btn btn-check">🔍 COMPROBAR CENTRADO</button>
+        <button id="btn-comprobar" class="btn btn-check">🎯 AUTO-AJUSTAR AL PVC Y COMPROBAR</button>
         <div class="row-buttons">
-            <button id="btn-camera" class="btn">📷 Cámara Frontal</button>
-            <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">📁 Cargar Foto</button>
+            <button id="btn-autosnap" class="btn active-mode">🧲 Auto-PVC: ON</button>
+            <button id="btn-camera" class="btn">📷 Cámara</button>
+            <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">📁 Foto</button>
         </div>
         <input type="file" id="file-input" accept="image/*">
     </div>
@@ -206,17 +213,12 @@
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const statusText = document.getElementById('status-text');
         const debugText = document.getElementById('debug-text');
-        const sliderQuality = document.getElementById('slider-quality');
-        const valQuality = document.getElementById('val-quality');
+        const sliderTol = document.getElementById('slider-tol');
+        const valTol = document.getElementById('val-tol');
+        const btnAutoSnap = document.getElementById('btn-autosnap');
 
-        // PARÁMETROS DE VISIÓN COMPUTACIONAL (Estandarizados)
-        const IMGSZ = 160;          // Tamaño fijo de reescalado de la región del O-ring (160x160 px)
-        const BLOCK_RADIUS = 4;     // Radio del Kernel (blockSize = 9x9) para compensar desenfoque focal
-        const MAX_CORNERS = 65;     // Número máximo de puntitos/esquinas a extraer
-        const MIN_DISTANCE = 5;     // Distancia mínima (px) entre puntos (Non-Maximum Suppression)
-        let qualityLevel = 0.22;    // Umbral relativo respecto al pico máximo de contraste
-
-        // Lienzo oculto de tamaño fijo imgsz (160x160) para análisis invariante a escala
+        // Matriz normalizada para procesar el hueco
+        const IMGSZ = 160;
         const roiCanvas = document.createElement('canvas');
         roiCanvas.width = IMGSZ;
         roiCanvas.height = IMGSZ;
@@ -226,26 +228,35 @@
         let staticImage = null;
         let reqAnimFrame = null;
 
-        // Geometría del O-ring en pantalla
+        // Coordenadas del hueco de PVC detectado
         let measureX = 0;
         let measureY = 0;
         let measureRadius = 70;
+
+        let autoSnapPVC = true;
+        let toleranciaMax = 25; // % de desvío máximo permitido respecto al borde de PVC
 
         let isDragging = false;
         let isResizing = false;
         let dragOffsetX = 0;
         let dragOffsetY = 0;
 
-        // Resultado del último análisis
+        // Resultados del análisis
         let comprobacionActiva = false;
-        let puntosDetectadosRojos = [];
-        let puntosDetectadosVerdes = [];
-        let vectorDesvio = null;
+        let puntosBlancosBorde = [];
+        let puntosBlancosInternos = [];
+        let centroMembrana = null;
 
-        sliderQuality.addEventListener('input', (e) => {
-            qualityLevel = parseInt(e.target.value, 10) / 100;
-            valQuality.textContent = qualityLevel.toFixed(2);
-            if (comprobacionActiva) ejecutarAnalisisVisión();
+        sliderTol.addEventListener('input', (e) => {
+            toleranciaMax = parseInt(e.target.value, 10);
+            valTol.textContent = toleranciaMax + '%';
+            if (comprobacionActiva) analizarSinAutoSnap();
+        });
+
+        btnAutoSnap.addEventListener('click', () => {
+            autoSnapPVC = !autoSnapPVC;
+            btnAutoSnap.textContent = `🧲 Auto-PVC: ${autoSnapPVC ? 'ON' : 'OFF'}`;
+            btnAutoSnap.classList.toggle('active-mode', autoSnapPVC);
         });
 
         function resizeCanvas() {
@@ -256,7 +267,7 @@
             if (measureX === 0 && canvas.width > 0) {
                 measureX = canvas.width / 2;
                 measureY = canvas.height / 2;
-                measureRadius = Math.min(canvas.width, canvas.height) * 0.24;
+                measureRadius = Math.min(canvas.width, canvas.height) * 0.20;
             }
         }
         window.addEventListener('resize', resizeCanvas);
@@ -274,16 +285,18 @@
 
         canvas.addEventListener('pointerdown', (e) => {
             const pos = getPointerPos(e);
-            const dx = pos.x - measureX;
-            const dy = pos.y - measureY;
-            const dist = Math.hypot(dx, dy);
+            const dist = Math.hypot(pos.x - measureX, pos.y - measureY);
 
-            // Al tocar para mover el círculo, ocultamos los puntos anteriores para ver limpia la imagen
             comprobacionActiva = false;
 
-            if (Math.abs(dist - measureRadius) < 38) {
+            // Si toca el punto amarillo lateral, permite ajustar el radio manualmente
+            if (Math.abs(dist - measureRadius) < 32 && Math.abs(pos.x - (measureX + measureRadius)) < 40) {
                 isResizing = true;
-            } else if (dist < measureRadius * 1.2) {
+                return;
+            }
+
+            // Si toca en cualquier parte, coloca ahí la semilla y arrastra
+            if (dist < measureRadius * 1.1) {
                 isDragging = true;
                 dragOffsetX = measureX - pos.x;
                 dragOffsetY = measureY - pos.y;
@@ -306,16 +319,19 @@
                 measureY = Math.max(30, Math.min(canvas.height - 30, pos.y + dragOffsetY));
             } else if (isResizing) {
                 const dist = Math.hypot(pos.x - measureX, pos.y - measureY);
-                measureRadius = Math.max(35, Math.min(Math.min(canvas.width, canvas.height) * 0.46, dist));
+                measureRadius = Math.max(30, Math.min(Math.min(canvas.width, canvas.height) * 0.45, dist));
             }
         });
 
         window.addEventListener('pointerup', () => {
+            if (isDragging && autoSnapPVC && (isVideoPlaying || staticImage)) {
+                // Al soltar el dedo sobre el agujero, encaja solo en el PVC negro y analiza
+                ejecutarProcesoCompleto();
+            }
             isDragging = false;
             isResizing = false;
         });
 
-        // Activar Cámara Frontal
         document.getElementById('btn-camera').addEventListener('click', async () => {
             staticImage = null;
             comprobacionActiva = false;
@@ -326,7 +342,7 @@
                 video.srcObject = stream;
                 await video.play();
                 isVideoPlaying = true;
-                statusText.textContent = "CÁMARA ACTIVA - PULSA COMPROBAR";
+                statusText.textContent = "TOCA EL HUECO DE LA CELDA";
                 statusText.className = "buscando";
                 if (!reqAnimFrame) renderLoop();
             } catch (err) {
@@ -334,7 +350,6 @@
             }
         });
 
-        // Cargar Foto Real
         document.getElementById('file-input').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -350,9 +365,9 @@
                 const img = new Image();
                 img.onload = () => {
                     staticImage = img;
-                    statusText.textContent = "FOTO CARGADA - SITÚA EL ANILLO";
+                    statusText.textContent = "TOCA EL AGUJERO EN LA FOTO";
                     statusText.className = "buscando";
-                    debugText.textContent = "Coloca el círculo amarillo en el O-ring y pulsa Comprobar";
+                    debugText.textContent = "Toca encima del hueco negro para auto-encajar el anillo";
                     if (!reqAnimFrame) renderLoop();
                 };
                 img.src = ev.target.result;
@@ -360,7 +375,6 @@
             reader.readAsDataURL(file);
         });
 
-        // Dibujar fotograma base limpio (sin superposiciones) para poder leer sus píxeles reales
         function dibujarFotogramaBase() {
             if (isVideoPlaying && video.readyState >= 2) {
                 const hRatio = canvas.width / video.videoWidth;
@@ -392,18 +406,142 @@
             return false;
         }
 
-        // MOTOR DE VISIÓN CLÁSICA: Normalización + Top-Hat + Esquinas (maxCorners, qualityLevel, minDistance)
-        function ejecutarAnalisisVisión() {
+        // PASO 1: AUTO-AJUSTE AL HUECO DEL PLÁSTICO PVC NEGRO OSCURO
+        function autoAjustarAlHuecoPVC() {
+            dibujarFotogramaBase();
+
+            const searchR = Math.round(measureRadius * 1.45);
+            const sx = Math.max(0, Math.round(measureX - searchR));
+            const sy = Math.max(0, Math.round(measureY - searchR));
+            const sw = Math.min(canvas.width - sx, searchR * 2);
+            const sh = Math.min(canvas.height - sy, searchR * 2);
+            if (sw < 40 || sh < 40) return;
+
+            const rgba = ctx.getImageData(sx, sy, sw, sh).data;
+            const lum = new Float32Array(sw * sh);
+            for (let i = 0; i < sw * sh; i++) {
+                lum[i] = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+            }
+
+            // 1. Medir el tono exacto del plástico PVC negro mate alrededor del hueco
+            const pvcSamples = [];
+            for (let y = 3; y < sh - 3; y += 2) {
+                for (let x = 3; x < sw - 3; x += 2) {
+                    const dist = Math.hypot((sx + x) - measureX, (sy + y) - measureY);
+                    if (dist > measureRadius * 0.95 && dist < searchR * 0.95) {
+                        const l = lum[y * sw + x];
+                        // El PVC negro mate es oscuro (25..105) y de textura muy lisa
+                        const diffLocal = Math.abs(l - lum[y * sw + (x - 2)]) + Math.abs(l - lum[(y - 2) * sw + x]);
+                        if (l > 22 && l < 110 && diffLocal < 14) {
+                            pvcSamples.push(l);
+                        }
+                    }
+                }
+            }
+
+            pvcSamples.sort((a, b) => a - b);
+            const pvcLum = pvcSamples.length > 10
+                ? pvcSamples[Math.floor(pvcSamples.length * 0.5)]
+                : 65;
+
+            // Función que distingue si un píxel pertenece al interior del hueco (diferente del PVC mate)
+            function esInteriorHueco(px, py) {
+                if (px < 2 || px >= sw - 2 || py < 2 || py >= sh - 2) return false;
+                const l = lum[py * sw + px];
+                const grad = Math.abs(lum[py * sw + (px + 2)] - lum[py * sw + (px - 2)]) +
+                             Math.abs(lum[(py + 2) * sw + px] - lum[(py - 2) * sw + px]);
+                // Es hueco si es mucho más brillante (aluminio/puntos blancos), más negro (O-ring/espejo) o tiene alto contraste
+                return Math.abs(l - pvcLum) > 16 || grad > 22;
+            }
+
+            // 2. Desplazar el centro automáticamente hacia el centro de masa del hueco (3 iteraciones Mean-Shift)
+            let cx = measureX - sx;
+            let cy = measureY - sy;
+            let rEst = measureRadius;
+
+            for (let iter = 0; iter < 3; iter++) {
+                let sumX = 0, sumY = 0, count = 0;
+                const scanR = rEst * 1.1;
+                for (let y = Math.max(2, Math.floor(cy - scanR)); y < Math.min(sh - 2, Math.ceil(cy + scanR)); y += 2) {
+                    for (let x = Math.max(2, Math.floor(cx - scanR)); x < Math.min(sw - 2, Math.ceil(cx + scanR)); x += 2) {
+                        if (Math.hypot(x - cx, y - cy) <= scanR && esInteriorHueco(x, y)) {
+                            sumX += x;
+                            sumY += y;
+                            count++;
+                        }
+                    }
+                }
+                if (count > 30) {
+                    cx = cx * 0.3 + (sumX / count) * 0.7;
+                    cy = cy * 0.3 + (sumY / count) * 0.7;
+                }
+            }
+
+            // 3. Lanzar 64 rayos desde el centro hacia el PVC negro para medir el borde exacto del hueco
+            const numRays = 64;
+            const edgePoints = [];
+            const maxRayR = Math.min(searchR * 0.95, Math.min(sw, sh) * 0.48);
+
+            for (let i = 0; i < numRays; i++) {
+                const ang = (i / numRays) * Math.PI * 2;
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+
+                let lastHoleR = rEst * 0.5;
+                let pvcStreak = 0;
+
+                for (let r = Math.round(rEst * 0.45); r < maxRayR; r += 2) {
+                    const px = Math.round(cx + cosA * r);
+                    const py = Math.round(cy + sinA * r);
+                    if (esInteriorHueco(px, py)) {
+                        lastHoleR = r;
+                        pvcStreak = 0;
+                    } else {
+                        pvcStreak++;
+                        // Si llevamos 4 pasos seguidos dentro del plástico PVC negro uniforme, hemos cruzado el borde
+                        if (pvcStreak >= 4) break;
+                    }
+                }
+                edgePoints.push({
+                    r: lastHoleR,
+                    x: cx + cosA * lastHoleR,
+                    y: cy + sinA * lastHoleR
+                });
+            }
+
+            // Filtrar posibles valores atípicos usando la mediana de los radios
+            const sortedR = edgePoints.map(p => p.r).sort((a, b) => a - b);
+            const medianR = sortedR[Math.floor(sortedR.length * 0.5)];
+
+            let validSumX = 0, validSumY = 0, validR = 0, validCount = 0;
+            for (const pt of edgePoints) {
+                if (Math.abs(pt.r - medianR) < medianR * 0.25) {
+                    validSumX += pt.x;
+                    validSumY += pt.y;
+                    validR += pt.r;
+                    validCount++;
+                }
+            }
+
+            if (validCount >= 20) {
+                // Actualizar centro y radio al hueco real del PVC negro
+                measureX = sx + cx;
+                measureY = sy + cy;
+                measureRadius = Math.max(32, Math.min(Math.min(canvas.width, canvas.height) * 0.42, validR / validCount));
+            }
+        }
+
+        // PASO 2: DETECTAR PUNTOS BLANCOS Y COMPARAR CON EL BORDE DE PVC NEGRO
+        function analizarSinAutoSnap() {
             if (!dibujarFotogramaBase()) {
                 alert("Primero activa la cámara o carga una fotografía.");
                 return;
             }
 
-            // 1. Recortar el O-ring y reescalarlo a imgsz = 160x160
             const N = IMGSZ;
             const half = N / 2;
-            const rNorm = half * 0.92; // Radio del O-ring en la matriz 160x160
-            const srcR = measureRadius / 0.92;
+            const rPVC = half * 0.88; // El borde de PVC negro queda mapeado en rPVC
+            const srcR = measureRadius / 0.88;
 
             roiCtx.clearRect(0, 0, N, N);
             roiCtx.drawImage(
@@ -414,231 +552,218 @@
 
             const rgba = roiCtx.getImageData(0, 0, N, N).data;
             const rawLum = new Float32Array(N * N);
-            const valoresInternos = [];
+            const innerVals = [];
 
             for (let y = 0; y < N; y++) {
                 for (let x = 0; x < N; x++) {
                     const i = y * N + x;
                     const l = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
                     rawLum[i] = l;
-                    if (Math.hypot(x - half, y - half) < rNorm * 0.95) {
-                        valoresInternos.push(l);
+                    if (Math.hypot(x - half, y - half) <= rPVC) {
+                        innerVals.push(l);
                     }
                 }
             }
 
-            // 2. Compensación de Exposición y Ganancia (Estiramiento entre percentil 5% y 95%)
-            valoresInternos.sort((a, b) => a - b);
-            const pMin = valoresInternos[Math.floor(valoresInternos.length * 0.05)] || 0;
-            const pMax = valoresInternos[Math.floor(valoresInternos.length * 0.95)] || 255;
-            const rangoDinamico = Math.max(8, pMax - pMin);
+            // Normalizar exposición entre el negro del PVC/espejo (percentil 5%) y los brillos (95%)
+            innerVals.sort((a, b) => a - b);
+            const pMin = innerVals[Math.floor(innerVals.length * 0.05)] || 0;
+            const pMax = innerVals[Math.floor(innerVals.length * 0.95)] || 255;
+            const dynRange = Math.max(12, pMax - pMin);
 
-            const normLum = new Float32Array(N * N);
+            const lum = new Float32Array(N * N);
             for (let i = 0; i < rawLum.length; i++) {
-                normLum[i] = Math.max(0, Math.min(255, ((rawLum[i] - pMin) / rangoDinamico) * 255));
+                lum[i] = Math.max(0, Math.min(255, ((rawLum[i] - pMin) / dynRange) * 255));
             }
 
-            // 3. Suavizado ligero 3x3 + Cálculo de Respuesta Top-Hat / Esquina 2D con blockSize (k = 4 px)
-            const k = BLOCK_RADIUS;
-            const responseMap = new Float32Array(N * N);
-            let maxResponse = 0;
+            // Filtro Simétrico de Puntos Blancos 2D (Rechaza el reflejo grande del espejo)
+            // Un punto blanco real es pequeño (radio 2..4 px) y está rodeado de oscuridad en ambos lados opuestos
+            const spotCandidates = [];
 
-            // También medimos el centro de masa de las zonas de alto contraste (el espejo anodizado)
-            let contrastSumX = 0, contrastSumY = 0, contrastWeight = 0;
-
-            for (let y = k + 2; y < N - k - 2; y++) {
-                for (let x = k + 2; x < N - k - 2; x++) {
+            for (let y = 5; y < N - 5; y++) {
+                for (let x = 5; x < N - 5; x++) {
                     const dx = x - half;
                     const dy = y - half;
                     const dist = Math.hypot(dx, dy);
-                    if (dist > rNorm * 0.98) continue;
+                    if (dist > rPVC * 1.05 || dist < rPVC * 0.15) continue;
 
-                    const idx = y * N + x;
-                    // Media local 3x3 en el centro
-                    const c = (
-                        normLum[idx] * 2 +
-                        normLum[idx - 1] + normLum[idx + 1] +
-                        normLum[idx - N] + normLum[idx + N]
-                    ) / 6;
+                    const c = lum[y * N + x];
+                    if (c < 115) continue; // Debe ser un punto claro/blanco
 
-                    // Vecinos a distancia k (blockSize = 9x9) en 4 ejes (Horizontal, Vertical y 2 Diagonales)
-                    const nL = normLum[y * N + (x - k)], nR = normLum[y * N + (x + k)];
-                    const nU = normLum[(y - k) * N + x], nD = normLum[(y + k) * N + x];
-                    const nUL = normLum[(y - k) * N + (x - k)], nDR = normLum[(y + k) * N + (x + k)];
-                    const nUR = normLum[(y - k) * N + (x + k)], nDL = normLum[(y + k) * N + (x - k)];
+                    // Evaluar prominencia simétrica a radio k = 3 px en 4 ejes
+                    // min(c - lado1, c - lado2) da 0 en los bordes de un reflejo grande, y alto en un puntito blanco
+                    let bestSym = 0;
+                    for (const k of [2, 4]) {
+                        const symH = Math.min(c - lum[y * N + (x - k)], c - lum[y * N + (x + k)]);
+                        const symV = Math.min(c - lum[(y - k) * N + x], c - lum[(y + k) * N + x]);
+                        const symD1 = Math.min(c - lum[(y - k) * N + (x - k)], c - lum[(y + k) * N + (x + k)]);
+                        const symD2 = Math.min(c - lum[(y - k) * N + (x + k)], c - lum[(y + k) * N + (x - k)]);
 
-                    // Cresta brillante (puntito blanco o borde iluminado que sobresale de su vecindad)
-                    const peakH = c - 0.5 * (nL + nR);
-                    const peakV = c - 0.5 * (nU + nD);
-                    const peakD1 = c - 0.5 * (nUL + nDR);
-                    const peakD2 = c - 0.5 * (nUR + nDL);
+                        const axes = [symH, symV, symD1, symD2].sort((a, b) => b - a);
+                        // Al menos en 2 ejes el punto blanco debe sobresalir por ambos lados
+                        const scoreK = (axes[0] + axes[1]) * 0.5;
+                        if (scoreK > bestSym) bestSym = scoreK;
+                    }
 
-                    // Salto de escalón (gradiente entre la zona negra de espejo y el aluminio gris opaco)
-                    const gradMag = Math.hypot(nR - nL, nD - nU);
+                    // Además, debe estar en contacto cercano con zona oscura (PVC negro o borde oscuro del espejo)
+                    let minDarkNeighbor = 255;
+                    for (let ny = -4; ny <= 4; ny += 2) {
+                        for (let nx = -4; nx <= 4; nx += 2) {
+                            const nl = lum[(y + ny) * N + (x + nx)];
+                            if (nl < minDarkNeighbor) minDarkNeighbor = nl;
+                        }
+                    }
 
-                    // Un "puntito blanco" o escalón rugoso tiene pico positivo en varias direcciones + alto gradiente
-                    const topHatPeak = Math.max(0, peakH) + Math.max(0, peakV) + Math.max(0, peakD1) + Math.max(0, peakD2);
-                    const cornerScore = topHatPeak * 0.65 + gradMag * 0.35;
-
-                    responseMap[idx] = cornerScore;
-                    if (cornerScore > maxResponse) maxResponse = cornerScore;
-
-                    if (dist < rNorm * 0.85 && gradMag > 35) {
-                        contrastSumX += dx * gradMag;
-                        contrastSumY += dy * gradMag;
-                        contrastWeight += gradMag;
+                    if (bestSym > 16 && minDarkNeighbor < 95) {
+                        spotCandidates.push({ x, y, dx, dy, dist, score: bestSym });
                     }
                 }
             }
 
-            // 4. Selección de Características con qualityLevel, minDistance (NMS) y maxCorners
-            const candidates = [];
-            const minAcceptedScore = maxResponse * qualityLevel;
-
-            for (let y = k + 2; y < N - k - 2; y++) {
-                for (let x = k + 2; x < N - k - 2; x++) {
-                    const s = responseMap[y * N + x];
-                    if (s >= minAcceptedScore && s > 15) {
-                        candidates.push({ x, y, s });
-                    }
-                }
-            }
-
-            // Ordenar de mayor a menor confianza
-            candidates.sort((a, b) => b.s - a.s);
-
-            const selectedCorners = [];
-            for (const cand of candidates) {
-                if (selectedCorners.length >= MAX_CORNERS) break;
-                let tooClose = false;
-                for (const sel of selectedCorners) {
-                    if (Math.hypot(cand.x - sel.x, cand.y - sel.y) < MIN_DISTANCE) {
-                        tooClose = true;
+            // Supresión de No-Máximos (minDistance = 5 px) para quedarnos con cada puntito blanco individual
+            spotCandidates.sort((a, b) => b.score - a.score);
+            const whiteDots = [];
+            for (const cand of spotCandidates) {
+                if (whiteDots.length >= 55) break;
+                let close = false;
+                for (const sel of whiteDots) {
+                    if (Math.hypot(cand.x - sel.x, cand.y - sel.y) < 5) {
+                        close = true;
                         break;
                     }
                 }
-                if (!tooClose) selectedCorners.push(cand);
+                if (!close) whiteDots.push(cand);
             }
 
-            // 5. Clasificar puntos entre Núcleo Interior (< 0.68 R) y Corona del O-ring (0.68 R - 0.98 R)
-            puntosDetectadosRojos = [];
-            puntosDetectadosVerdes = [];
-            const rCoreLimit = rNorm * 0.68;
-            const sectoresCorona = new Array(8).fill(0);
-            let sumRedX = 0, sumRedY = 0;
+            // Clasificar los puntos blancos respecto al borde de PVC negro (rPVC)
+            puntosBlancosBorde = [];
+            puntosBlancosInternos = [];
 
-            for (const pt of selectedCorners) {
-                const dx = pt.x - half;
-                const dy = pt.y - half;
-                const dist = Math.hypot(dx, dy);
+            // También calculamos el centro de la zona oscura anodizada + puntos blancos para medir su desvío respecto al PVC
+            let sumMemX = 0, sumMemY = 0, weightMem = 0;
 
-                // Transformar de la matriz 160x160 a las coordenadas reales de la pantalla
-                const screenX = measureX + (dx / rNorm) * measureRadius;
-                const screenY = measureY + (dy / rNorm) * measureRadius;
+            for (let y = 4; y < N - 4; y += 2) {
+                for (let x = 4; x < N - 4; x += 2) {
+                    const dx = x - half;
+                    const dy = y - half;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist <= rPVC * 0.95) {
+                        const l = lum[y * N + x];
+                        // La zona anodizada tiene fuerte contraste especular (negro profundo + reflejo vivo),
+                        // a diferencia del aluminio sin anodizar que es gris intermedio plano
+                        const isAnodizedZone = (l < 65 || l > 175) ? 1.0 : 0.15;
+                        sumMemX += dx * isAnodizedZone;
+                        sumMemY += dy * isAnodizedZone;
+                        weightMem += isAnodizedZone;
+                    }
+                }
+            }
 
-                if (dist < rCoreLimit) {
-                    puntosDetectadosRojos.push({ x: screenX, y: screenY });
-                    sumRedX += dx;
-                    sumRedY += dy;
+            for (const pt of whiteDots) {
+                const screenX = measureX + (pt.dx / rPVC) * measureRadius;
+                const screenY = measureY + (pt.dy / rPVC) * measureRadius;
+
+                // Si el punto blanco está situado junto al plástico negro del PVC (radio >= 65% de rPVC)
+                if (pt.dist >= rPVC * 0.65) {
+                    puntosBlancosBorde.push({ x: screenX, y: screenY });
                 } else {
-                    puntosDetectadosVerdes.push({ x: screenX, y: screenY });
-                    const sector = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * 8) % 8;
-                    sectoresCorona[sector]++;
+                    puntosBlancosInternos.push({ x: screenX, y: screenY });
                 }
             }
 
-            // 6. Evaluar Desvío del Centroide y Proporción de Intrusión en el Núcleo
-            const numRojos = puntosDetectadosRojos.length;
-            const numVerdes = puntosDetectadosVerdes.length;
-            const totalPts = Math.max(1, numRojos + numVerdes);
-            const ratioIntrusión = (numRojos / totalPts) * 100;
-            const sectoresOcupados = sectoresCorona.filter(s => s > 0).length;
+            // Calcular el desvío porcentual entre el centro de la membrana y el centro del hueco de PVC negro
+            const memOffsetX = weightMem > 0 ? (sumMemX / weightMem) : 0;
+            const memOffsetY = weightMem > 0 ? (sumMemY / weightMem) : 0;
+            const desvioPorcentaje = Math.round((Math.hypot(memOffsetX, memOffsetY) / (rPVC * 0.45)) * 100);
 
-            // Desplazamiento del centro de contraste del espejo (0% = centrado, >20% = desplazado a un lado)
-            const desvioEspejo = contrastWeight > 0
-                ? (Math.hypot(contrastSumX / contrastWeight, contrastSumY / contrastWeight) / rNorm) * 100
-                : 0;
+            centroMembrana = {
+                x: measureX + (memOffsetX / rPVC) * measureRadius * 1.8,
+                y: measureY + (memOffsetY / rPVC) * measureRadius * 1.8
+            };
 
-            // Si hay puntos rojos en el interior o el espejo está muy desplazado -> DESCENTRADA
-            const esDescentrada = (ratioIntrusión > 28) || (desvioEspejo > 22 && numRojos >= 6) || (sectoresOcupados < 3 && numRojos > numVerdes);
+            const totalDots = puntosBlancosBorde.length + puntosBlancosInternos.length;
+            const ratioEnPVC = totalDots > 0 ? Math.round((puntosBlancosBorde.length / totalDots) * 100) : 100;
 
-            if (esDescentrada) {
-                const conf = Math.min(99, Math.round(ratioIntrusión + desvioEspejo * 0.8));
-                statusText.textContent = `❌ DESCENTRADA (Corte: ${ ratioIntrusión.toFixed(0) }%)`;
-                statusText.className = "descentrada";
-                if (numRojos > 0) {
-                    const ang = Math.atan2(sumRedY / numRojos, sumRedX / numRojos);
-                    vectorDesvio = {
-                        x: Math.cos(ang) * (measureRadius * 0.55),
-                        y: Math.sin(ang) * (measureRadius * 0.55)
-                    };
-                }
-            } else {
-                const conf = Math.min(99, Math.max(70, Math.round(100 - ratioIntrusión * 0.8)));
-                statusText.textContent = `✅ CENTRADA (Conf: ${ conf }%)`;
+            // Decisión comparando con el área de PVC negro y la tolerancia elegida
+            if (desvioPorcentaje <= toleranciaMax && ratioEnPVC >= 55) {
+                statusText.textContent = `✅ CENTRADA (Desvío: ${desvioPorcentaje}%)`;
                 statusText.className = "centrada";
-                vectorDesvio = null;
+            } else {
+                statusText.textContent = `❌ DESCENTRADA (Desvío: ${desvioPorcentaje}%)`;
+                statusText.className = "descentrada";
             }
 
-            debugText.textContent = `Núcleo (Rojos): ${numRojos} | Corona (Verdes): ${numVerdes} | Sectores: ${sectoresOcupados}/8`;
+            debugText.textContent = `Puntos blancos junto al PVC: ${puntosBlancosBorde.length}/${totalDots} (${ratioEnPVC}%)`;
             comprobacionActiva = true;
         }
 
-        document.getElementById('btn-comprobar').addEventListener('click', ejecutarAnalisisVisión);
+        function ejecutarProcesoCompleto() {
+            if (!isVideoPlaying && !staticImage) {
+                alert("Primero activa la cámara o carga una foto.");
+                return;
+            }
+            if (autoSnapPVC) {
+                autoAjustarAlHuecoPVC();
+            }
+            analizarSinAutoSnap();
+        }
+
+        document.getElementById('btn-comprobar').addEventListener('click', ejecutarProcesoCompleto);
 
         function renderLoop() {
             dibujarFotogramaBase();
 
-            // Si se ha pulsado Comprobar, pintar los puntos característicos detectados y el vector
+            // Dibujar el borde detectado del hueco de PVC negro
+            ctx.beginPath();
+            ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = comprobacionActiva
+                ? (statusText.className === 'centrada' ? '#32d74b' : '#ff453a')
+                : '#0a84ff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Si se ha comprobado, mostrar los puntos blancos detectados junto al PVC
             if (comprobacionActiva) {
-                // Puntos verdes en la corona del O-ring
-                ctx.fillStyle = '#32d74b';
-                for (const p of puntosDetectadosVerdes) {
+                // Puntos blancos situados correctamente junto al plástico negro (Cian brillante)
+                ctx.fillStyle = '#00f5d4';
+                for (const p of puntosBlancosBorde) {
                     ctx.beginPath();
                     ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
                     ctx.fill();
                 }
 
-                // Puntos rojos cortando el núcleo interior
-                ctx.fillStyle = '#ff453a';
-                for (const p of puntosDetectadosRojos) {
+                // Puntos blancos desviados hacia el interior (Naranja)
+                ctx.fillStyle = '#ff9f0a';
+                for (const p of puntosBlancosInternos) {
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
                     ctx.fill();
                 }
 
-                // Vector indicando dónde corta el borde
-                if (vectorDesvio) {
+                // Si está descentrada, mostrar vector desde el centro de la membrana al centro del hueco PVC
+                if (statusText.className === 'descentrada' && centroMembrana) {
                     ctx.strokeStyle = '#ff453a';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     ctx.moveTo(measureX, measureY);
-                    ctx.lineTo(measureX + vectorDesvio.x, measureY + vectorDesvio.y);
+                    ctx.lineTo(centroMembrana.x, centroMembrana.y);
                     ctx.stroke();
                 }
             }
 
-            // Dibujar el O-ring exterior
-            ctx.beginPath();
-            ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
-            ctx.strokeStyle = comprobacionActiva
-                ? (statusText.className === 'centrada' ? '#32d74b' : '#ff453a')
-                : '#ffd60a';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            // Dibujar límite del núcleo interior (68% del radio)
-            ctx.beginPath();
-            ctx.arc(measureX, measureY, measureRadius * 0.68, 0, 2 * Math.PI);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-            ctx.setLineDash([6, 6]);
+            // Cruceta central del hueco de PVC
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
             ctx.lineWidth = 1.5;
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Tirador amarillo lateral para cambiar el tamaño
             ctx.beginPath();
-            ctx.arc(measureX + measureRadius, measureY, 13, 0, 2 * Math.PI);
+            ctx.moveTo(measureX - 6, measureY);
+            ctx.lineTo(measureX + 6, measureY);
+            ctx.moveTo(measureX, measureY - 6);
+            ctx.lineTo(measureX, measureY + 6);
+            ctx.stroke();
+
+            // Tirador amarillo lateral por si el usuario quiere retocar el tamaño a mano
+            ctx.beginPath();
+            ctx.arc(measureX + measureRadius, measureY, 12, 0, 2 * Math.PI);
             ctx.fillStyle = '#ffd60a';
             ctx.fill();
             ctx.strokeStyle = '#000';
