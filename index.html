@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Detector NAA - Cámara Frontal (Móvil)</title>
+    <title>Detector NAA - Visión Computacional</title>
     <style>
         :root {
             --bg-color: #000000;
-            --panel-bg: #1a1a1a;
+            --panel-bg: #18181b;
             --text-color: #ffffff;
             --accent-color: #0a84ff;
             --danger-color: #ff453a;
@@ -15,37 +15,39 @@
             --warning-color: #ffd60a;
         }
 
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
+            height: 100dvh;
             background-color: var(--bg-color);
             color: var(--text-color);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden; 
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
         #header {
             width: 100%;
-            padding: 10px 0;
-            text-align: center;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             background-color: var(--panel-bg);
             z-index: 20;
             flex-shrink: 0;
+            border-bottom: 1px solid #27272a;
         }
 
-        h1 { margin: 0; font-size: 1.1rem; font-weight: 500; }
+        h1 { margin: 0; font-size: 0.95rem; font-weight: 600; }
 
         #main-container {
             flex-grow: 1;
             position: relative;
             width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             background-color: #000;
             overflow: hidden;
         }
@@ -58,116 +60,141 @@
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover; 
+            display: block;
             touch-action: none;
         }
 
         #status-overlay {
             position: absolute;
-            top: 15px;
+            top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.85);
-            padding: 15px 25px;
+            background-color: rgba(15, 15, 20, 0.88);
+            padding: 10px 16px;
             border-radius: 12px;
             text-align: center;
             pointer-events: none;
             z-index: 10;
-            backdrop-filter: blur(5px);
-            border: 1px solid #333;
-            min-width: 200px;
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255,255,255,0.15);
+            width: 90%;
+            max-width: 360px;
         }
 
         #status-text {
-            font-size: 1.4rem;
-            font-weight: bold;
+            font-size: 1.25rem;
+            font-weight: 800;
             margin: 0;
-            letter-spacing: 0.5px;
         }
 
         #status-text.centrada { color: var(--success-color); }
         #status-text.descentrada { color: var(--danger-color); }
-        #status-text.buscando { color: var(--text-color); font-size: 1.1rem; }
+        #status-text.buscando { color: var(--warning-color); font-size: 1rem; }
 
         .instructions {
             position: absolute;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
             text-align: center;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             color: rgba(255,255,255,0.9);
+            background: rgba(0,0,0,0.65);
+            padding: 6px 10px;
+            border-radius: 20px;
             pointer-events: none;
             z-index: 10;
-            text-shadow: 0px 1px 3px rgba(0,0,0,1);
         }
 
         #controls {
             width: 100%;
             background-color: var(--panel-bg);
-            padding: 15px 12px;
+            padding: 10px 12px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            box-sizing: border-box;
+            gap: 8px;
             z-index: 20;
             flex-shrink: 0;
+            border-top: 1px solid #27272a;
         }
-        
+
+        .param-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            color: #d4d4d8;
+        }
+
+        .param-bar input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent-color);
+        }
+
         .row-buttons {
             display: flex;
-            justify-content: space-between;
-            gap: 10px;
+            gap: 8px;
         }
 
         .btn {
-            background-color: #333;
+            background-color: #27272a;
             color: white;
-            border: none;
-            padding: 14px 10px;
+            border: 1px solid #3f3f46;
+            padding: 11px 8px;
             border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: bold;
+            font-size: 0.88rem;
+            font-weight: 600;
             cursor: pointer;
-            flex: 1; 
+            flex: 1;
             text-align: center;
         }
-        
-        /* Botón destacado para realizar la comprobación */
+
         .btn-check {
             background-color: var(--accent-color);
-            font-size: 1.1rem;
-            padding: 16px;
-            text-transform: uppercase;
-            box-shadow: 0 4px 10px rgba(10, 132, 255, 0.4);
+            border: none;
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 13px;
+            box-shadow: 0 3px 10px rgba(10, 132, 255, 0.35);
         }
 
-        .btn:active { transform: scale(0.97); filter: brightness(0.9); }
+        .btn:active { transform: scale(0.98); filter: brightness(0.9); }
         #file-input { display: none; }
     </style>
 </head>
 <body>
 
     <div id="header">
-        <h1>Alineación NAA (Cámara Frontal)</h1>
+        <h1>🔬 Alineador NAA (Espejo / Top-Hat)</h1>
+        <span id="res-badge" style="font-size: 0.75rem; color: #a1a1aa;">imgsz: 160x160</span>
     </div>
 
     <div id="main-container">
-        <video id="video-element" autoplay playsinline></video>
+        <video id="video-element" autoplay playsinline muted></video>
         <canvas id="main-canvas"></canvas>
-        
+
         <div id="status-overlay">
-            <p id="status-text" class="buscando">MUEVE EL ANILLO Y PULSA COMPROBAR</p>
-            <p id="debug-text" style="font-size: 0.85rem; margin-top:5px; color:#aaa;">Listo para escanear</p>
+            <p id="status-text" class="buscando">AJUSTA EL ANILLO Y PULSA COMPROBAR</p>
+            <p id="debug-text" style="font-size: 0.78rem; margin: 4px 0 0 0; color:#cbd5e1;">
+                Auto-exposición y detector Shi-Tomasi listos
+            </p>
         </div>
-        
-        <div class="instructions" id="inst-text">👆 Arrastra el círculo. Tira del punto amarillo para tamaño.</div>
+
+        <div class="instructions" id="inst-text">
+            👆 Arrastra el círculo al agujero | Tira del punto amarillo para el tamaño
+        </div>
     </div>
 
     <div id="controls">
+        <div class="param-bar">
+            <span>Sensibilidad (qualityLevel):</span>
+            <input type="range" id="slider-quality" min="10" max="45" value="22">
+            <span id="val-quality">0.22</span>
+        </div>
         <button id="btn-comprobar" class="btn btn-check">🔍 COMPROBAR CENTRADO</button>
         <div class="row-buttons">
-            <button id="btn-camera" class="btn">Activar Cámara Frontal</button>
+            <button id="btn-camera" class="btn">📷 Cámara Frontal</button>
             <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">📁 Cargar Foto</button>
         </div>
         <input type="file" id="file-input" accept="image/*">
@@ -179,51 +206,66 @@
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const statusText = document.getElementById('status-text');
         const debugText = document.getElementById('debug-text');
-        const instText = document.getElementById('inst-text');
-        
-        const btnCamera = document.getElementById('btn-camera');
-        const btnComprobar = document.getElementById('btn-comprobar');
-        const fileInput = document.getElementById('file-input');
+        const sliderQuality = document.getElementById('slider-quality');
+        const valQuality = document.getElementById('val-quality');
+
+        // PARÁMETROS DE VISIÓN COMPUTACIONAL (Estandarizados)
+        const IMGSZ = 160;          // Tamaño fijo de reescalado de la región del O-ring (160x160 px)
+        const BLOCK_RADIUS = 4;     // Radio del Kernel (blockSize = 9x9) para compensar desenfoque focal
+        const MAX_CORNERS = 65;     // Número máximo de puntitos/esquinas a extraer
+        const MIN_DISTANCE = 5;     // Distancia mínima (px) entre puntos (Non-Maximum Suppression)
+        let qualityLevel = 0.22;    // Umbral relativo respecto al pico máximo de contraste
+
+        // Lienzo oculto de tamaño fijo imgsz (160x160) para análisis invariante a escala
+        const roiCanvas = document.createElement('canvas');
+        roiCanvas.width = IMGSZ;
+        roiCanvas.height = IMGSZ;
+        const roiCtx = roiCanvas.getContext('2d', { willReadFrequently: true });
 
         let isVideoPlaying = false;
         let staticImage = null;
-        let reqAnimFrame;
+        let reqAnimFrame = null;
 
-        // Variables del O-ring
+        // Geometría del O-ring en pantalla
         let measureX = 0;
         let measureY = 0;
-        let measureRadius = 50;
+        let measureRadius = 70;
 
         let isDragging = false;
         let isResizing = false;
         let dragOffsetX = 0;
         let dragOffsetY = 0;
-        
-        // Estado del test
+
+        // Resultado del último análisis
         let comprobacionActiva = false;
-        // Resultados guardados en el momento de pulsar el botón
-        let ultimosPuntosRojos = [];
-        let ultimosPuntosVerdes = [];
+        let puntosDetectadosRojos = [];
+        let puntosDetectadosVerdes = [];
+        let vectorDesvio = null;
+
+        sliderQuality.addEventListener('input', (e) => {
+            qualityLevel = parseInt(e.target.value, 10) / 100;
+            valQuality.textContent = qualityLevel.toFixed(2);
+            if (comprobacionActiva) ejecutarAnalisisVisión();
+        });
 
         function resizeCanvas() {
             const container = document.getElementById('main-container');
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
-            
-            if (measureX === 0) {
+
+            if (measureX === 0 && canvas.width > 0) {
                 measureX = canvas.width / 2;
                 measureY = canvas.height / 2;
-                measureRadius = Math.min(canvas.width, canvas.height) / 4;
+                measureRadius = Math.min(canvas.width, canvas.height) * 0.24;
             }
         }
         window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 100);
+        setTimeout(resizeCanvas, 80);
 
         function getPointerPos(e) {
             const rect = canvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
             return {
                 x: (clientX - rect.left) * (canvas.width / rect.width),
                 y: (clientY - rect.top) * (canvas.height / rect.height)
@@ -231,43 +273,40 @@
         }
 
         canvas.addEventListener('pointerdown', (e) => {
-            // Si está bloqueado mostrando el resultado, un toque desbloquea y reinicia
-            if (comprobacionActiva) {
-                comprobacionActiva = false;
-                statusText.textContent = "MUEVE EL ANILLO Y PULSA COMPROBAR";
-                statusText.className = "buscando";
-                debugText.textContent = "Listo para escanear";
-                instText.style.display = "block";
-                return;
-            }
-
             const pos = getPointerPos(e);
             const dx = pos.x - measureX;
             const dy = pos.y - measureY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            
-            if (Math.abs(dist - measureRadius) < 40) {
+            const dist = Math.hypot(dx, dy);
+
+            // Al tocar para mover el círculo, ocultamos los puntos anteriores para ver limpia la imagen
+            comprobacionActiva = false;
+
+            if (Math.abs(dist - measureRadius) < 38) {
                 isResizing = true;
-            } else if (dist < measureRadius) {
+            } else if (dist < measureRadius * 1.2) {
                 isDragging = true;
                 dragOffsetX = measureX - pos.x;
                 dragOffsetY = measureY - pos.y;
+            } else {
+                measureX = pos.x;
+                measureY = pos.y;
+                isDragging = true;
+                dragOffsetX = 0;
+                dragOffsetY = 0;
             }
         });
 
         window.addEventListener('pointermove', (e) => {
-            if (!isDragging && !isResizing || comprobacionActiva) return;
-            e.preventDefault(); 
-            
+            if (!isDragging && !isResizing) return;
+            e.preventDefault();
             const pos = getPointerPos(e);
-            
+
             if (isDragging) {
-                measureX = pos.x + dragOffsetX;
-                measureY = pos.y + dragOffsetY;
+                measureX = Math.max(30, Math.min(canvas.width - 30, pos.x + dragOffsetX));
+                measureY = Math.max(30, Math.min(canvas.height - 30, pos.y + dragOffsetY));
             } else if (isResizing) {
-                const dx = pos.x - measureX;
-                const dy = pos.y - measureY;
-                measureRadius = Math.max(40, Math.sqrt(dx*dx + dy*dy));
+                const dist = Math.hypot(pos.x - measureX, pos.y - measureY);
+                measureRadius = Math.max(35, Math.min(Math.min(canvas.width, canvas.height) * 0.46, dist));
             }
         });
 
@@ -276,204 +315,340 @@
             isResizing = false;
         });
 
-        btnCamera.addEventListener('click', async () => {
+        // Activar Cámara Frontal
+        document.getElementById('btn-camera').addEventListener('click', async () => {
             staticImage = null;
             comprobacionActiva = false;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
                 video.srcObject = stream;
-                video.play();
+                await video.play();
                 isVideoPlaying = true;
-                if (!reqAnimFrame) processFrame();
+                statusText.textContent = "CÁMARA ACTIVA - PULSA COMPROBAR";
+                statusText.className = "buscando";
+                if (!reqAnimFrame) renderLoop();
             } catch (err) {
-                alert("Error al abrir cámara frontal. Revisa los permisos.");
+                alert("No se pudo abrir la cámara frontal. Revisa los permisos HTTPS.");
             }
         });
 
-        fileInput.addEventListener('change', (e) => {
+        // Cargar Foto Real
+        document.getElementById('file-input').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            
+
             if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject.getTracks().forEach(t => t.stop());
             }
             isVideoPlaying = false;
             comprobacionActiva = false;
 
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = (ev) => {
                 const img = new Image();
                 img.onload = () => {
                     staticImage = img;
-                    if (!reqAnimFrame) processFrame();
-                }
-                img.src = event.target.result;
-            }
+                    statusText.textContent = "FOTO CARGADA - SITÚA EL ANILLO";
+                    statusText.className = "buscando";
+                    debugText.textContent = "Coloca el círculo amarillo en el O-ring y pulsa Comprobar";
+                    if (!reqAnimFrame) renderLoop();
+                };
+                img.src = ev.target.result;
+            };
             reader.readAsDataURL(file);
         });
 
-        // LÓGICA DEL BOTÓN COMPROBAR
-        btnComprobar.addEventListener('click', () => {
-            if (!isVideoPlaying && !staticImage) {
-                alert("Primero debes activar la cámara o subir una foto.");
-                return;
-            }
-            // Esto activará el análisis profundo en el próximo frame
-            comprobacionActiva = true;
-            instText.style.display = "none";
-        });
-
-        function processFrame() {
-            // 1. Dibujar el fotograma
-            if (isVideoPlaying && video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Dibujar fotograma base limpio (sin superposiciones) para poder leer sus píxeles reales
+        function dibujarFotogramaBase() {
+            if (isVideoPlaying && video.readyState >= 2) {
                 const hRatio = canvas.width / video.videoWidth;
                 const vRatio = canvas.height / video.videoHeight;
                 const ratio = Math.max(hRatio, vRatio);
-                const centerShift_x = (canvas.width - video.videoWidth * ratio) / 2;
-                const centerShift_y = (canvas.height - video.videoHeight * ratio) / 2;
-                
+                const cx = (canvas.width - video.videoWidth * ratio) / 2;
+                const cy = (canvas.height - video.videoHeight * ratio) / 2;
+
                 ctx.save();
                 ctx.translate(canvas.width, 0);
                 ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, -centerShift_x, centerShift_y, video.videoWidth * ratio, video.videoHeight * ratio);
+                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, -cx, cy, video.videoWidth * ratio, video.videoHeight * ratio);
                 ctx.restore();
-
+                return true;
             } else if (staticImage) {
                 const hRatio = canvas.width / staticImage.width;
                 const vRatio = canvas.height / staticImage.height;
                 const ratio = Math.min(hRatio, vRatio);
-                const centerShift_x = (canvas.width - staticImage.width * ratio) / 2;
-                const centerShift_y = (canvas.height - staticImage.height * ratio) / 2;  
+                const cx = (canvas.width - staticImage.width * ratio) / 2;
+                const cy = (canvas.height - staticImage.height * ratio) / 2;
+
                 ctx.fillStyle = '#000';
-                ctx.fillRect(0,0, canvas.width, canvas.height);
-                ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, centerShift_x, centerShift_y, staticImage.width * ratio, staticImage.height * ratio);
-            } else {
-                ctx.fillStyle = '#111';
-                ctx.fillRect(0,0, canvas.width, canvas.height);
-                reqAnimFrame = requestAnimationFrame(processFrame);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, cx, cy, staticImage.width * ratio, staticImage.height * ratio);
+                return true;
+            }
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            return false;
+        }
+
+        // MOTOR DE VISIÓN CLÁSICA: Normalización + Top-Hat + Esquinas (maxCorners, qualityLevel, minDistance)
+        function ejecutarAnalisisVisión() {
+            if (!dibujarFotogramaBase()) {
+                alert("Primero activa la cámara o carga una fotografía.");
                 return;
             }
 
-            // 2. Si el usuario ha pulsado COMPROBAR, ejecutamos el algoritmo
-            if (comprobacionActiva) {
-                const startX = Math.max(0, measureX - measureRadius);
-                const startY = Math.max(0, measureY - measureRadius);
-                const endX = Math.min(canvas.width, measureX + measureRadius);
-                const endY = Math.min(canvas.height, measureY + measureRadius);
-                const width = endX - startX;
-                const height = endY - startY;
+            // 1. Recortar el O-ring y reescalarlo a imgsz = 160x160
+            const N = IMGSZ;
+            const half = N / 2;
+            const rNorm = half * 0.92; // Radio del O-ring en la matriz 160x160
+            const srcR = measureRadius / 0.92;
 
-                if (width > 0 && height > 0) {
-                    const imgData = ctx.getImageData(startX, startY, width, height);
-                    const data = imgData.data;
-                    
-                    ultimosPuntosRojos = [];
-                    ultimosPuntosVerdes = [];
-                    let totalPixelesNucleo = 0;
-                    const radioNucleo = measureRadius * 0.70; 
-                    
-                    const grises = new Uint8Array(width * height);
-                    for (let i = 0; i < data.length; i += 4) {
-                        grises[i/4] = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    }
+            roiCtx.clearRect(0, 0, N, N);
+            roiCtx.drawImage(
+                canvas,
+                measureX - srcR, measureY - srcR, srcR * 2, srcR * 2,
+                0, 0, N, N
+            );
 
-                    // Aumento de tolerancia: el salto de luz (laplaciano) ahora solo necesita ser > 35 (antes 60)
-                    for (let y = 1; y < height - 1; y += 2) {
-                        for (let x = 1; x < width - 1; x += 2) {
-                            const canvasX = startX + x;
-                            const canvasY = startY + y;
-                            const dx = canvasX - measureX;
-                            const dy = canvasY - measureY;
-                            const dist = Math.sqrt(dx*dx + dy*dy);
+            const rgba = roiCtx.getImageData(0, 0, N, N).data;
+            const rawLum = new Float32Array(N * N);
+            const valoresInternos = [];
 
-                            if (dist <= measureRadius) {
-                                const idx = y * width + x;
-                                const centerPx = grises[idx];
-                                const laplacian = Math.abs(
-                                    4 * centerPx 
-                                    - grises[idx - 1] 
-                                    - grises[idx + 1] 
-                                    - grises[(y-1) * width + x] 
-                                    - grises[(y+1) * width + x]
-                                );
-
-                                // Filtro bajado a 35 para ser más sensible en móviles oscuros
-                                if (laplacian > 35 && centerPx > 70) { 
-                                    if (dist < radioNucleo) {
-                                        ultimosPuntosRojos.push({x: canvasX, y: canvasY});
-                                    } else {
-                                        ultimosPuntosVerdes.push({x: canvasX, y: canvasY});
-                                    }
-                                }
-                                if (dist < radioNucleo) totalPixelesNucleo++;
-                            }
-                        }
-                    }
-
-                    const puntosCortantes = ultimosPuntosRojos.length;
-                    const puntosBorde = ultimosPuntosVerdes.length;
-                    const densidadCorte = totalPixelesNucleo > 0 ? (puntosCortantes / totalPixelesNucleo) * 100 : 0;
-                    
-                    debugText.textContent = `Pixeles centro: ${puntosCortantes} (${densidadCorte.toFixed(2)}%) | Borde: ${puntosBorde}`;
-
-                    // Lógica estricta de decisión
-                    // Umbral de corte bajado a 0.25% para detectar rápido cualquier fallo
-                    if (densidadCorte > 0.25) { 
-                        statusText.textContent = "❌ DESCENTRADA";
-                        statusText.className = "descentrada";
-                    } else if (puntosBorde > 8) { // Solo necesita detectar 8 puntos en el borde para dar el OK
-                        statusText.textContent = "✅ CENTRADA";
-                        statusText.className = "centrada";
-                    } else {
-                        statusText.textContent = "⚠️ MUESTRA NO DETECTADA";
-                        statusText.className = "buscando";
-                        debugText.textContent = "El interior está vacío o muy oscuro";
+            for (let y = 0; y < N; y++) {
+                for (let x = 0; x < N; x++) {
+                    const i = y * N + x;
+                    const l = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+                    rawLum[i] = l;
+                    if (Math.hypot(x - half, y - half) < rNorm * 0.95) {
+                        valoresInternos.push(l);
                     }
                 }
             }
 
-            // 3. DIBUJAR LOS PUNTOS ENCONTRADOS SI ESTAMOS EN MODO RESULTADO
-            if (comprobacionActiva) {
-                ctx.fillStyle = 'rgba(255, 69, 58, 0.8)'; // Rojo intenso
-                for(let p of ultimosPuntosRojos) {
-                    ctx.fillRect(p.x, p.y, 4, 4);
-                }
-                ctx.fillStyle = 'rgba(50, 215, 75, 0.6)'; // Verde brillante
-                for(let p of ultimosPuntosVerdes) {
-                    ctx.fillRect(p.x, p.y, 3, 3);
+            // 2. Compensación de Exposición y Ganancia (Estiramiento entre percentil 5% y 95%)
+            valoresInternos.sort((a, b) => a - b);
+            const pMin = valoresInternos[Math.floor(valoresInternos.length * 0.05)] || 0;
+            const pMax = valoresInternos[Math.floor(valoresInternos.length * 0.95)] || 255;
+            const rangoDinamico = Math.max(8, pMax - pMin);
+
+            const normLum = new Float32Array(N * N);
+            for (let i = 0; i < rawLum.length; i++) {
+                normLum[i] = Math.max(0, Math.min(255, ((rawLum[i] - pMin) / rangoDinamico) * 255));
+            }
+
+            // 3. Suavizado ligero 3x3 + Cálculo de Respuesta Top-Hat / Esquina 2D con blockSize (k = 4 px)
+            const k = BLOCK_RADIUS;
+            const responseMap = new Float32Array(N * N);
+            let maxResponse = 0;
+
+            // También medimos el centro de masa de las zonas de alto contraste (el espejo anodizado)
+            let contrastSumX = 0, contrastSumY = 0, contrastWeight = 0;
+
+            for (let y = k + 2; y < N - k - 2; y++) {
+                for (let x = k + 2; x < N - k - 2; x++) {
+                    const dx = x - half;
+                    const dy = y - half;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > rNorm * 0.98) continue;
+
+                    const idx = y * N + x;
+                    // Media local 3x3 en el centro
+                    const c = (
+                        normLum[idx] * 2 +
+                        normLum[idx - 1] + normLum[idx + 1] +
+                        normLum[idx - N] + normLum[idx + N]
+                    ) / 6;
+
+                    // Vecinos a distancia k (blockSize = 9x9) en 4 ejes (Horizontal, Vertical y 2 Diagonales)
+                    const nL = normLum[y * N + (x - k)], nR = normLum[y * N + (x + k)];
+                    const nU = normLum[(y - k) * N + x], nD = normLum[(y + k) * N + x];
+                    const nUL = normLum[(y - k) * N + (x - k)], nDR = normLum[(y + k) * N + (x + k)];
+                    const nUR = normLum[(y - k) * N + (x + k)], nDL = normLum[(y + k) * N + (x - k)];
+
+                    // Cresta brillante (puntito blanco o borde iluminado que sobresale de su vecindad)
+                    const peakH = c - 0.5 * (nL + nR);
+                    const peakV = c - 0.5 * (nU + nD);
+                    const peakD1 = c - 0.5 * (nUL + nDR);
+                    const peakD2 = c - 0.5 * (nUR + nDL);
+
+                    // Salto de escalón (gradiente entre la zona negra de espejo y el aluminio gris opaco)
+                    const gradMag = Math.hypot(nR - nL, nD - nU);
+
+                    // Un "puntito blanco" o escalón rugoso tiene pico positivo en varias direcciones + alto gradiente
+                    const topHatPeak = Math.max(0, peakH) + Math.max(0, peakV) + Math.max(0, peakD1) + Math.max(0, peakD2);
+                    const cornerScore = topHatPeak * 0.65 + gradMag * 0.35;
+
+                    responseMap[idx] = cornerScore;
+                    if (cornerScore > maxResponse) maxResponse = cornerScore;
+
+                    if (dist < rNorm * 0.85 && gradMag > 35) {
+                        contrastSumX += dx * gradMag;
+                        contrastSumY += dy * gradMag;
+                        contrastWeight += gradMag;
+                    }
                 }
             }
 
-            // 4. DIBUJAR GUÍAS (O-Ring)
+            // 4. Selección de Características con qualityLevel, minDistance (NMS) y maxCorners
+            const candidates = [];
+            const minAcceptedScore = maxResponse * qualityLevel;
+
+            for (let y = k + 2; y < N - k - 2; y++) {
+                for (let x = k + 2; x < N - k - 2; x++) {
+                    const s = responseMap[y * N + x];
+                    if (s >= minAcceptedScore && s > 15) {
+                        candidates.push({ x, y, s });
+                    }
+                }
+            }
+
+            // Ordenar de mayor a menor confianza
+            candidates.sort((a, b) => b.s - a.s);
+
+            const selectedCorners = [];
+            for (const cand of candidates) {
+                if (selectedCorners.length >= MAX_CORNERS) break;
+                let tooClose = false;
+                for (const sel of selectedCorners) {
+                    if (Math.hypot(cand.x - sel.x, cand.y - sel.y) < MIN_DISTANCE) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (!tooClose) selectedCorners.push(cand);
+            }
+
+            // 5. Clasificar puntos entre Núcleo Interior (< 0.68 R) y Corona del O-ring (0.68 R - 0.98 R)
+            puntosDetectadosRojos = [];
+            puntosDetectadosVerdes = [];
+            const rCoreLimit = rNorm * 0.68;
+            const sectoresCorona = new Array(8).fill(0);
+            let sumRedX = 0, sumRedY = 0;
+
+            for (const pt of selectedCorners) {
+                const dx = pt.x - half;
+                const dy = pt.y - half;
+                const dist = Math.hypot(dx, dy);
+
+                // Transformar de la matriz 160x160 a las coordenadas reales de la pantalla
+                const screenX = measureX + (dx / rNorm) * measureRadius;
+                const screenY = measureY + (dy / rNorm) * measureRadius;
+
+                if (dist < rCoreLimit) {
+                    puntosDetectadosRojos.push({ x: screenX, y: screenY });
+                    sumRedX += dx;
+                    sumRedY += dy;
+                } else {
+                    puntosDetectadosVerdes.push({ x: screenX, y: screenY });
+                    const sector = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * 8) % 8;
+                    sectoresCorona[sector]++;
+                }
+            }
+
+            // 6. Evaluar Desvío del Centroide y Proporción de Intrusión en el Núcleo
+            const numRojos = puntosDetectadosRojos.length;
+            const numVerdes = puntosDetectadosVerdes.length;
+            const totalPts = Math.max(1, numRojos + numVerdes);
+            const ratioIntrusión = (numRojos / totalPts) * 100;
+            const sectoresOcupados = sectoresCorona.filter(s => s > 0).length;
+
+            // Desplazamiento del centro de contraste del espejo (0% = centrado, >20% = desplazado a un lado)
+            const desvioEspejo = contrastWeight > 0
+                ? (Math.hypot(contrastSumX / contrastWeight, contrastSumY / contrastWeight) / rNorm) * 100
+                : 0;
+
+            // Si hay puntos rojos en el interior o el espejo está muy desplazado -> DESCENTRADA
+            const esDescentrada = (ratioIntrusión > 28) || (desvioEspejo > 22 && numRojos >= 6) || (sectoresOcupados < 3 && numRojos > numVerdes);
+
+            if (esDescentrada) {
+                const conf = Math.min(99, Math.round(ratioIntrusión + desvioEspejo * 0.8));
+                statusText.textContent = `❌ DESCENTRADA (Corte: ${ ratioIntrusión.toFixed(0) }%)`;
+                statusText.className = "descentrada";
+                if (numRojos > 0) {
+                    const ang = Math.atan2(sumRedY / numRojos, sumRedX / numRojos);
+                    vectorDesvio = {
+                        x: Math.cos(ang) * (measureRadius * 0.55),
+                        y: Math.sin(ang) * (measureRadius * 0.55)
+                    };
+                }
+            } else {
+                const conf = Math.min(99, Math.max(70, Math.round(100 - ratioIntrusión * 0.8)));
+                statusText.textContent = `✅ CENTRADA (Conf: ${ conf }%)`;
+                statusText.className = "centrada";
+                vectorDesvio = null;
+            }
+
+            debugText.textContent = `Núcleo (Rojos): ${numRojos} | Corona (Verdes): ${numVerdes} | Sectores: ${sectoresOcupados}/8`;
+            comprobacionActiva = true;
+        }
+
+        document.getElementById('btn-comprobar').addEventListener('click', ejecutarAnalisisVisión);
+
+        function renderLoop() {
+            dibujarFotogramaBase();
+
+            // Si se ha pulsado Comprobar, pintar los puntos característicos detectados y el vector
+            if (comprobacionActiva) {
+                // Puntos verdes en la corona del O-ring
+                ctx.fillStyle = '#32d74b';
+                for (const p of puntosDetectadosVerdes) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Puntos rojos cortando el núcleo interior
+                ctx.fillStyle = '#ff453a';
+                for (const p of puntosDetectadosRojos) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Vector indicando dónde corta el borde
+                if (vectorDesvio) {
+                    ctx.strokeStyle = '#ff453a';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(measureX, measureY);
+                    ctx.lineTo(measureX + vectorDesvio.x, measureY + vectorDesvio.y);
+                    ctx.stroke();
+                }
+            }
+
+            // Dibujar el O-ring exterior
             ctx.beginPath();
             ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
-            ctx.strokeStyle = comprobacionActiva ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 235, 59, 0.9)';
-            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = comprobacionActiva
+                ? (statusText.className === 'centrada' ? '#32d74b' : '#ff453a')
+                : '#ffd60a';
+            ctx.lineWidth = 3;
             ctx.stroke();
 
+            // Dibujar límite del núcleo interior (68% del radio)
             ctx.beginPath();
-            ctx.arc(measureX, measureY, measureRadius * 0.70, 0, 2 * Math.PI);
-            ctx.strokeStyle = comprobacionActiva ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.4)';
+            ctx.arc(measureX, measureY, measureRadius * 0.68, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
             ctx.setLineDash([6, 6]);
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.setLineDash([]); 
+            ctx.setLineDash([]);
 
-            // Tirador para redimensionar (Solo se dibuja si NO está en modo comprobación)
-            if (!comprobacionActiva) {
-                ctx.beginPath();
-                ctx.arc(measureX + measureRadius, measureY, 15, 0, 2 * Math.PI);
-                ctx.fillStyle = 'rgba(255, 235, 59, 0.8)';
-                ctx.fill();
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-            }
+            // Tirador amarillo lateral para cambiar el tamaño
+            ctx.beginPath();
+            ctx.arc(measureX + measureRadius, measureY, 13, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffd60a';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
-            reqAnimFrame = requestAnimationFrame(processFrame);
+            reqAnimFrame = requestAnimationFrame(renderLoop);
         }
+
+        renderLoop();
     </script>
 </body>
 </html>
