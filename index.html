@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Alineador NAA - Detección de Aluminio Opaco</title>
+    <title>Alineador NAA - Control de Centrado</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -33,7 +33,7 @@
 
         #header {
             width: 100%;
-            padding: 8px 12px;
+            padding: 10px 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -43,7 +43,7 @@
             border-bottom: 1px solid #27272a;
         }
 
-        h1 { margin: 0; font-size: 0.92rem; font-weight: 600; }
+        h1 { margin: 0; font-size: 0.95rem; font-weight: 600; }
 
         #main-container {
             flex-grow: 1;
@@ -83,7 +83,7 @@
         }
 
         #status-text {
-            font-size: 1.32rem;
+            font-size: 1.35rem;
             font-weight: 800;
             margin: 0;
         }
@@ -93,7 +93,7 @@
         #status-text.buscando { color: var(--warning-color); font-size: 1.05rem; }
 
         #pct-pvc-text {
-            font-size: 1.02rem;
+            font-size: 1.05rem;
             font-weight: 700;
             margin: 6px 0 2px 0;
             color: var(--cyan-color);
@@ -127,19 +127,6 @@
             border-top: 1px solid #27272a;
         }
 
-        .param-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.78rem;
-            color: #d4d4d8;
-        }
-
-        .param-bar input[type="range"] {
-            flex: 1;
-            accent-color: var(--accent-color);
-        }
-
         .row-buttons {
             display: flex;
             gap: 8px;
@@ -166,7 +153,7 @@
         .btn-check {
             background-color: var(--accent-color);
             border: none;
-            font-size: 1.05rem;
+            font-size: 1.1rem;
             font-weight: 800;
             padding: 14px;
             letter-spacing: 0.5px;
@@ -181,7 +168,7 @@
 
     <div id="header">
         <h1>🔬 Alineador NAA</h1>
-        <span style="font-size: 0.72rem; color: #00f5d4;">● Junto a PVC &nbsp; <span style="color:#ff453a;">● Aluminio opaco</span></span>
+        <span style="font-size: 0.75rem; color: #00f5d4;">● Borde alumina &nbsp; <span style="color:#ff453a;">● Aluminio</span></span>
     </div>
 
     <div id="main-container">
@@ -190,28 +177,23 @@
 
         <div id="status-overlay">
             <p id="status-text" class="buscando">TOCA EL AGUJERO Y PULSA COMPROBAR</p>
-            <p id="pct-pvc-text">Puntos blancos junto al PVC: --%</p>
+            <p id="pct-pvc-text">Borde alumina: --%</p>
             <p id="debug-text" style="font-size: 0.75rem; margin: 2px 0 0 0; color:#cbd5e1;">
-                Filtra reflejos de luz y detecta aluminio opaco
+                Detección de aluminio sin anodizar
             </p>
         </div>
 
         <div id="inst-text" class="instructions">
-            👆 Toca el hueco negro para encajar el círculo o tira del punto amarillo
+            👆 Toca el hueco negro para encajar el círculo o arrástralo
         </div>
     </div>
 
     <div id="controls">
-        <div class="param-bar">
-            <span>Exigencia junto al PVC:</span>
-            <input type="range" id="slider-min-pvc" min="55" max="95" value="80">
-            <span id="val-min-pvc">80%</span>
-        </div>
         <button id="btn-comprobar" class="btn btn-check">COMPROBAR</button>
         <div class="row-buttons">
             <button id="btn-autosnap" class="btn active-mode">🧲 Auto-PVC: ON</button>
             <button id="btn-camera" class="btn">📷 Cámara</button>
-            <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">📁 Foto</button>
+            <button id="btn-image" class="btn">📁 Foto</button>
         </div>
         <input type="file" id="file-input" accept="image/*">
     </div>
@@ -223,9 +205,9 @@
         const statusText = document.getElementById('status-text');
         const pctPvcText = document.getElementById('pct-pvc-text');
         const debugText = document.getElementById('debug-text');
-        const sliderMinPvc = document.getElementById('slider-min-pvc');
-        const valMinPvc = document.getElementById('val-min-pvc');
         const btnAutoSnap = document.getElementById('btn-autosnap');
+        const btnImage = document.getElementById('btn-image');
+        const fileInput = document.getElementById('file-input');
 
         const IMGSZ = 160;
         const roiCanvas = document.createElement('canvas');
@@ -239,182 +221,4 @@
 
         let measureX = 0;
         let measureY = 0;
-        let measureRadius = 70;
-
-        let autoSnapPVC = true;
-        let minPorcentajePVC = 80;
-
-        let isDragging = false;
-        let isResizing = false;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
-
-        let comprobacionActiva = false;
-        let puntosJuntoPVC = [];
-        let puntosConAluminioOpaco = [];
-
-        sliderMinPvc.addEventListener('input', (e) => {
-            minPorcentajePVC = parseInt(e.target.value, 10);
-            valMinPvc.textContent = minPorcentajePVC + '%';
-            if (comprobacionActiva) analizarMuestra();
-        });
-
-        btnAutoSnap.addEventListener('click', () => {
-            autoSnapPVC = !autoSnapPVC;
-            btnAutoSnap.textContent = `🧲 Auto-PVC: ${autoSnapPVC ? 'ON' : 'OFF'}`;
-            btnAutoSnap.classList.toggle('active-mode', autoSnapPVC);
-        });
-
-        function resizeCanvas() {
-            const container = document.getElementById('main-container');
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-
-            if (measureX === 0 && canvas.width > 0) {
-                measureX = canvas.width / 2;
-                measureY = canvas.height / 2;
-                measureRadius = Math.min(canvas.width, canvas.height) * 0.20;
-            }
-        }
-        window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 80);
-
-        function getPointerPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            return {
-                x: (clientX - rect.left) * (canvas.width / rect.width),
-                y: (clientY - rect.top) * (canvas.height / rect.height)
-            };
-        }
-
-        canvas.addEventListener('pointerdown', (e) => {
-            const pos = getPointerPos(e);
-            const dist = Math.hypot(pos.x - measureX, pos.y - measureY);
-
-            comprobacionActiva = false;
-
-            if (Math.abs(dist - measureRadius) < 32 && Math.abs(pos.x - (measureX + measureRadius)) < 40) {
-                isResizing = true;
-                return;
-            }
-
-            if (dist < measureRadius * 1.1) {
-                isDragging = true;
-                dragOffsetX = measureX - pos.x;
-                dragOffsetY = measureY - pos.y;
-            } else {
-                measureX = pos.x;
-                measureY = pos.y;
-                isDragging = true;
-                dragOffsetX = 0;
-                dragOffsetY = 0;
-            }
-        });
-
-        canvas.addEventListener('pointermove', (e) => {
-            if (!isDragging && !isResizing) return;
-            e.preventDefault();
-            const pos = getPointerPos(e);
-
-            if (isDragging) {
-                measureX = Math.max(30, Math.min(canvas.width - 30, pos.x + dragOffsetX));
-                measureY = Math.max(30, Math.min(canvas.height - 30, pos.y + dragOffsetY));
-            } else if (isResizing) {
-                const dist = Math.hypot(pos.x - measureX, pos.y - measureY);
-                measureRadius = Math.max(30, Math.min(Math.min(canvas.width, canvas.height) * 0.45, dist));
-            }
-        });
-
-        window.addEventListener('pointerup', () => {
-            if (isDragging && autoSnapPVC && (isVideoPlaying || staticImage)) {
-                autoAjustarAlHuecoPVC();
-            }
-            isDragging = false;
-            isResizing = false;
-        });
-
-        document.getElementById('btn-camera').addEventListener('click', async () => {
-            staticImage = null;
-            comprobacionActiva = false;
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }
-                });
-                video.srcObject = stream;
-                await video.play();
-                isVideoPlaying = true;
-                statusText.textContent = "CÁMARA LISTA - PULSA COMPROBAR";
-                statusText.className = "buscando";
-                if (!reqAnimFrame) renderLoop();
-            } catch (err) {
-                alert("No se pudo abrir la cámara frontal. Revisa los permisos HTTPS.");
-            }
-        });
-
-        document.getElementById('file-input').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(t => t.stop());
-            }
-            isVideoPlaying = false;
-            comprobacionActiva = false;
-
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onload = () => {
-                    staticImage = img;
-                    statusText.textContent = "TOCA EL AGUJERO Y PULSA COMPROBAR";
-                    statusText.className = "buscando";
-                    pctPvcText.textContent = "Puntos blancos junto al PVC: --%";
-                    if (!reqAnimFrame) renderLoop();
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-
-        function dibujarFotogramaBase() {
-            if (isVideoPlaying && video.readyState >= 2) {
-                const hRatio = canvas.width / video.videoWidth;
-                const vRatio = canvas.height / video.videoHeight;
-                const ratio = Math.max(hRatio, vRatio);
-                const cx = (canvas.width - video.videoWidth * ratio) / 2;
-                const cy = (canvas.height - video.videoHeight * ratio) / 2;
-
-                ctx.save();
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, -cx, cy, video.videoWidth * ratio, video.videoHeight * ratio);
-                ctx.restore();
-                return true;
-            } else if (staticImage) {
-                const hRatio = canvas.width / staticImage.width;
-                const vRatio = canvas.height / staticImage.height;
-                const ratio = Math.min(hRatio, vRatio);
-                const cx = (canvas.width - staticImage.width * ratio) / 2;
-                const cy = (canvas.height - staticImage.height * ratio) / 2;
-
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, cx, cy, staticImage.width * ratio, staticImage.height * ratio);
-                return true;
-            }
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            return false;
-        }
-
-        // PASO 1: ENCAJAR EL CÍRCULO EN EL HUECO DE PVC NEGRO
-        function autoAjustarAlHuecoPVC() {
-            dibujarFotogramaBase();
-
-            const searchR = Math.round(measureRadius * 1.45);
-            const sx = Math.max(0, Math.round(measureX - searchR));
-            const sy = Math.max(0, Math.round(measureY - searchR));
-            const sw = Math.min(canvas.width - sx, searchR * 2);
-            const sh = Math.min(canvas.height - sy, searchR *
+        let measure
