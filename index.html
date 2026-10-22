@@ -1,187 +1,460 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NAA Align - Centrado de Membranas</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #1e293b;
-      --text: #f8fafc;
-      --blue: #3b82f6;
-      --red: #ef4444;
-      --amber: #f59e0b;
-      --green: #10b981;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; user-select: none; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 8px;
-      transition: background 0.25s;
-    }
-    /* Modo iluminación coaxial con pantalla blanca */
-    body.torch-on {
-      background: #ffffff !important;
-      color: #0f172a !important;
-    }
-    body.torch-on .bottom-bar {
-      background: #f1f5f9;
-      color: #0f172a;
-      border: 1px solid #cbd5e1;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Detector de Centrado NAA (Computación Local)</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #ffffff;
+            --accent-color: #007bff;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+        }
 
-    /* Barra superior minimalista */
-    .top-bar {
-      width: 100%;
-      max-width: 600px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .status-pill {
-      flex: 1;
-      text-align: center;
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-weight: 800;
-      font-size: 0.9rem;
-      background: var(--red);
-      color: #fff;
-      letter-spacing: 0.5px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-      transition: background 0.2s;
-    }
-    .btn-help {
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: var(--panel);
-      color: #fff;
-      font-weight: 600;
-      font-size: 0.82rem;
-      cursor: pointer;
-    }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-    /* Contenedor de cámara en Alta Definición */
-    .camera-wrapper {
-      position: relative;
-      width: 100%;
-      max-width: 600px;
-      background: #000;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-      touch-action: none;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    video { display: none; }
-    canvas {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
+        #header {
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            background-color: var(--panel-bg);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
 
-    /* Mensajes flotantes sobre el vídeo */
-    .hud-top {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      display: flex;
-      justify-content: space-between;
-      pointer-events: none;
-    }
-    .hud-tag {
-      background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(4px);
-      color: #f8fafc;
-      padding: 6px 10px;
-      border-radius: 8px;
-      font-size: 0.78rem;
-      font-weight: 600;
-    }
-    .hud-bottom-hint {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.8);
-      color: #e2e8f0;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      pointer-events: none;
-      white-space: nowrap;
-    }
+        h1 { margin: 0; font-size: 1.2rem; font-weight: normal; }
 
-    /* Panel inferior simplificado */
-    .bottom-bar {
-      width: 100%;
-      max-width: 600px;
-      background: var(--panel);
-      border-radius: 14px;
-      padding: 12px;
-      margin-top: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .btn-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-    button {
-      padding: 10px;
-      border: none;
-      border-radius: 10px;
-      background: #334155;
-      color: #fff;
-      font-weight: 600;
-      font-size: 0.82rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-    button.primary { background: var(--blue); }
-    button.active { background: var(--green); }
-    button.locked { background: var(--amber); color: #000; }
+        #main-container {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
 
-    .sensitivity-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.8rem;
-    }
-    .sensitivity-row input { flex: 1; accent-color: var(--blue); }
+        #video-element { display: none; } /* Oculto, se dibuja en canvas */
 
-    /* Modal de Funcionamiento y Simulación */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.82);
-      backdrop-filter: blur(5px);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      padding: 14px;
-      z-index: 100;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal-card {
-      background: var(--panel);
-      color: var(--text);
-      width: 100%;
-      max-
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            /* Relación de aspecto típica 4:3 para cámara */
+            aspect-ratio: 4 / 3;
+            background-color: #000;
+        }
+
+        #main-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none; /* Previene scroll al tocar el canvas */
+        }
+
+        #status-overlay {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+            pointer-events: none;
+            width: 80%;
+        }
+
+        #status-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        #status-text.centrada { color: var(--success-color); }
+        #status-text.descentrada { color: var(--danger-color); }
+        #status-text.buscando { color: #ffc107; }
+
+        #controls {
+            width: 100%;
+            background-color: var(--panel-bg);
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .btn:hover { background-color: #0056b3; }
+        .btn:active { transform: scale(0.98); }
+
+        #file-input { display: none; }
+        
+        .instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.7);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h1>Control NAA - Visión Local</h1>
+    </div>
+
+    <div id="main-container">
+        <div id="canvas-container">
+            <video id="video-element" autoplay playsinline></video>
+            <canvas id="main-canvas"></canvas>
+            
+            <div id="status-overlay">
+                <p id="status-text" class="buscando">INICIANDO...</p>
+                <p id="debug-text" style="font-size: 0.8rem; margin-top:5px; color:#ccc;">Calculando cortes</p>
+            </div>
+            
+            <div class="instructions">Arrastra el círculo amarillo al agujero. Tira del borde para el tamaño.</div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-camera" class="btn">Activar Cámara</button>
+        <button id="btn-image" class="btn" onclick="document.getElementById('file-input').click()">Cargar Imagen</button>
+        <input type="file" id="file-input" accept="image/*">
+    </div>
+
+    <script>
+        const video = document.getElementById('video-element');
+        const canvas = document.getElementById('main-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const statusText = document.getElementById('status-text');
+        const debugText = document.getElementById('debug-text');
+        const btnCamera = document.getElementById('btn-camera');
+        const fileInput = document.getElementById('file-input');
+
+        let isVideoPlaying = false;
+        let staticImage = null;
+        let reqAnimFrame;
+
+        // Variables de la zona de medición (O-ring)
+        let measureX = 0;
+        let measureY = 0;
+        let measureRadius = 50;
+
+        // Variables para la interacción táctil
+        let isDragging = false;
+        let isResizing = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        // Configurar Canvas inicial
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            
+            // Centrar el área de medición la primera vez
+            if (measureX === 0) {
+                measureX = canvas.width / 2;
+                measureY = canvas.height / 2;
+                measureRadius = Math.min(canvas.width, canvas.height) / 4;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // -----------------------------------------------------------------
+        // CONTROL DE INTERACCIÓN: Tocar y arrastrar
+        // -----------------------------------------------------------------
+        
+        function getPointerPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Soporte para touch y ratón
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // Ajustar coordenadas a la escala interna del canvas
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            const pos = getPointerPos(e);
+            
+            // Comprobar distancia al centro
+            const dx = pos.x - measureX;
+            const dy = pos.y - measureY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // Margen para el borde (tirador de tamaño)
+            const edgeTolerance = 20;
+
+            if (Math.abs(dist - measureRadius) < edgeTolerance) {
+                // Toca el borde -> Modo cambiar tamaño
+                isResizing = true;
+            } else if (dist < measureRadius) {
+                // Toca el interior -> Modo mover
+                isDragging = true;
+                dragOffsetX = measureX - pos.x;
+                dragOffsetY = measureY - pos.y;
+            }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isDragging && !isResizing) return;
+            e.preventDefault(); // Evitar scroll en móviles
+            
+            const pos = getPointerPos(e);
+            
+            if (isDragging) {
+                measureX = pos.x + dragOffsetX;
+                measureY = pos.y + dragOffsetY;
+            } else if (isResizing) {
+                const dx = pos.x - measureX;
+                const dy = pos.y - measureY;
+                measureRadius = Math.max(20, Math.sqrt(dx*dx + dy*dy));
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isDragging = false;
+            isResizing = false;
+        });
+
+
+        // -----------------------------------------------------------------
+        // CONTROL DE ENTRADAS (CÁMARA / IMAGEN)
+        // -----------------------------------------------------------------
+
+        btnCamera.addEventListener('click', async () => {
+            staticImage = null;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
+                video.srcObject = stream;
+                video.play();
+                isVideoPlaying = true;
+                if (!reqAnimFrame) processFrame();
+            } catch (err) {
+                console.error("Error cámara:", err);
+                alert("No se pudo acceder a la cámara. Revisa permisos.");
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            isVideoPlaying = false;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    staticImage = img;
+                    if (!reqAnimFrame) processFrame();
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        });
+
+
+        // -----------------------------------------------------------------
+        // ALGORITMO DE VISIÓN COMPUTACIONAL LOCAL
+        // -----------------------------------------------------------------
+
+        function processFrame() {
+            // 1. Dibujar el fotograma actual o imagen en el canvas
+            if (isVideoPlaying && video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Modo cover para llenar el canvas
+                const hRatio = canvas.width / video.videoWidth;
+                const vRatio = canvas.height / video.videoHeight;
+                const ratio = Math.max(hRatio, vRatio);
+                const centerShift_x = (canvas.width - video.videoWidth * ratio) / 2;
+                const centerShift_y = (canvas.height - video.videoHeight * ratio) / 2;  
+                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, centerShift_x, centerShift_y, video.videoWidth * ratio, video.videoHeight * ratio);
+            } else if (staticImage) {
+                const hRatio = canvas.width / staticImage.width;
+                const vRatio = canvas.height / staticImage.height;
+                const ratio = Math.min(hRatio, vRatio); // Para imagen estática, fit en lugar de cover
+                const centerShift_x = (canvas.width - staticImage.width * ratio) / 2;
+                const centerShift_y = (canvas.height - staticImage.height * ratio) / 2;  
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.drawImage(staticImage, 0, 0, staticImage.width, staticImage.height, centerShift_x, centerShift_y, staticImage.width * ratio, staticImage.height * ratio);
+            } else {
+                // Pantalla negra si no hay entrada
+                ctx.fillStyle = '#1e1e1e';
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+                reqAnimFrame = requestAnimationFrame(processFrame);
+                return;
+            }
+
+            // 2. Extraer datos de píxeles SOLO de la zona de medición
+            const boundingBoxSize = measureRadius * 2;
+            const startX = Math.max(0, measureX - measureRadius);
+            const startY = Math.max(0, measureY - measureRadius);
+            const endX = Math.min(canvas.width, measureX + measureRadius);
+            const endY = Math.min(canvas.height, measureY + measureRadius);
+            const width = endX - startX;
+            const height = endY - startY;
+
+            if (width > 0 && height > 0) {
+                const imgData = ctx.getImageData(startX, startY, width, height);
+                const data = imgData.data;
+                
+                // Variables para el análisis
+                let puntosCortantes = 0; // Puntos de contraste dentro del núcleo (mala señal)
+                let puntosBorde = 0;     // Puntos de contraste en la corona (buena señal)
+                let totalPixelesNucleo = 0;
+
+                const radioNucleo = measureRadius * 0.70; // 70% interior
+                
+                // Conversión a escala de grises y búsqueda de bordes (contraste local)
+                const grises = new Uint8Array(width * height);
+                for (let i = 0; i < data.length; i += 4) {
+                    grises[i/4] = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                }
+
+                // Escaneo simplificado saltando píxeles para rendimiento (stride=2)
+                for (let y = 1; y < height - 1; y += 2) {
+                    for (let x = 1; x < width - 1; x += 2) {
+                        // Distancia al centro de medición
+                        const canvasX = startX + x;
+                        const canvasY = startY + y;
+                        const dx = canvasX - measureX;
+                        const dy = canvasY - measureY;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+
+                        // Solo nos importa lo que está dentro del radio del O-ring
+                        if (dist <= measureRadius) {
+                            
+                            // Detectar cambio brusco de luz (Línea del escalón anodizado / puntos blancos)
+                            const idx = y * width + x;
+                            const centerPx = grises[idx];
+                            // Operador Laplaciano muy simple (detecta bordes)
+                            const laplacian = Math.abs(
+                                4 * centerPx 
+                                - grises[idx - 1] 
+                                - grises[idx + 1] 
+                                - grises[(y-1) * width + x] 
+                                - grises[(y+1) * width + x]
+                            );
+
+                            // Umbral para considerar que es "el borde punteado de la muestra"
+                            // (El aluminio base y la alúmina son más uniformes, el borde resalta)
+                            if (laplacian > 60 && centerPx > 100) { 
+                                // ¿Dónde ha caído este borde?
+                                if (dist < radioNucleo) {
+                                    puntosCortantes++;
+                                    // Pintar rojo tenue para depuración
+                                    ctx.fillStyle = 'rgba(255,0,0,0.5)';
+                                    ctx.fillRect(canvasX, canvasY, 2, 2);
+                                } else {
+                                    puntosBorde++;
+                                    // Pintar verde tenue para depuración
+                                    ctx.fillStyle = 'rgba(0,255,0,0.3)';
+                                    ctx.fillRect(canvasX, canvasY, 2, 2);
+                                }
+                            }
+                            
+                            if (dist < radioNucleo) totalPixelesNucleo++;
+                        }
+                    }
+                }
+
+                // 3. Evaluar el estado
+                // La muestra está DESCENTRADA si el arco de puntos cruza por el medio
+                const densidadCorte = totalPixelesNucleo > 0 ? (puntosCortantes / totalPixelesNucleo) * 100 : 0;
+                
+                debugText.textContent = `Pixeles cortando centro: ${puntosCortantes} (${densidadCorte.toFixed(2)}%)`;
+
+                if (densidadCorte > 0.4) { 
+                    // Hay un corte significativo cruzando la zona central
+                    statusText.textContent = "DESCENTRADA";
+                    statusText.className = "descentrada";
+                } else if (puntosBorde > 20) {
+                    // El centro está limpio y detecta el arco apoyado en la corona
+                    statusText.textContent = "CENTRADA";
+                    statusText.className = "centrada";
+                } else {
+                    // No hay información suficiente (fondo vacío u oscuro)
+                    statusText.textContent = "BUSCANDO...";
+                    statusText.className = "buscando";
+                }
+            }
+
+            // 4. Dibujar la guía (O-ring virtual) encima de la imagen
+            ctx.beginPath();
+            ctx.arc(measureX, measureY, measureRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Dibujar círculo interno (zona prohibida para el borde de la membrana)
+            ctx.beginPath();
+            ctx.arc(measureX, measureY, measureRadius * 0.70, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset dash
+
+            // Dibujar punto de agarre para resize
+            ctx.beginPath();
+            ctx.arc(measureX + measureRadius, measureY, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255,255,0,0.8)';
+            ctx.fill();
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+
+            reqAnimFrame = requestAnimationFrame(processFrame);
+        }
+    </script>
+</body>
+</html>
